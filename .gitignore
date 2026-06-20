@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Env / secrets — never commit these
+.env
+**/.env
+.env.local
+**/.env.local
+.env*.local
+
+# Next.js build output
+client/.next/
+client/out/
+client/next-env.d.ts
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Large project artifacts (not needed to run the app)
+*.zip
+*.docx
+report_assets/

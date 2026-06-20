@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-primary: #5a0c93;
+  --color-primary-dark: #380063;
+  --color-accent: #8e44ad;
+  --color-accent-alt: #6a1b9a;
+  --color-success: #1f9e54;
+  --color-warn: #e69412;
+  --color-danger: #b3321e;
+  --color-surface: #ffffff;
+  --color-surface-alt: #e8dcf5;
+  --color-bg: #ddd0ef;
+  --color-border: #b8a3d4;
+  --color-text: #1a0f33;
+  --color-muted: #6d5a8a;
+}
+
+/* Scale the whole UI up: Tailwind's rem-based text, padding, gaps and sizes
+   all grow from this single root value (default browser size is 16px). */
+html {
+  font-size: 18px;
+}
+
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, var(--font-geist-sans), ui-sans-serif,
+    system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
