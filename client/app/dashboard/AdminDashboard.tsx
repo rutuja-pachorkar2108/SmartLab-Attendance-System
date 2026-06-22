@@ -184,6 +184,7 @@ function SideNavButton({
 function LabsTab() {
   const [labs, setLabs] = useState<Lab[]>([]);
   const [tas, setTas] = useState<AdminUser[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lab | null>(null);
@@ -193,12 +194,14 @@ function LabsTab() {
     setLoading(true);
     setError(null);
     try {
-      const [labData, taData] = await Promise.all([
+      const [labData, taData, deptData] = await Promise.all([
         api<{ labs: Lab[] }>("/api/labs"),
         api<{ users: AdminUser[] }>("/api/users?role=ta"),
+        api<{ departments: Department[] }>("/api/departments"),
       ]);
       setLabs(labData.labs);
       setTas(taData.users);
+      setDepartments(deptData.departments);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load");
     } finally {
@@ -240,6 +243,7 @@ function LabsTab() {
       <LabForm
         editing={editing}
         tas={tas}
+        departments={departments}
         onCancel={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
@@ -354,11 +358,13 @@ function LabViewModal({ lab, onClose }: { lab: Lab; onClose: () => void }) {
 function LabForm({
   editing,
   tas,
+  departments,
   onCancel,
   onSaved,
 }: {
   editing: Lab | null;
   tas: AdminUser[];
+  departments: Department[];
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -450,13 +456,23 @@ function LabForm({
             />
           </Field>
           <Field label="Department">
-            <input
+            <select
               className={inputCls}
               style={inputStyle}
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g. Computer Engineering"
-            />
+            >
+              <option value="">Select department</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+              {/* Preserve a legacy free-text value not in the departments list */}
+              {department && !departments.some((d) => d.name === department) && (
+                <option value={department}>{department}</option>
+              )}
+            </select>
           </Field>
           <Field label="Floor">
             <input

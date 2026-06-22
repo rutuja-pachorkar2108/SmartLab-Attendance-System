@@ -20,6 +20,18 @@ async function resolveTa(res, taId) {
     return { id: found.rows[0].id };
 }
 
+// A TA may be assigned to at most one lab. Returns the conflicting lab's name
+// if this TA is already assigned to a different lab, otherwise null.
+// Pass excludeLabId when editing so the lab being edited doesn't conflict with itself.
+async function taAssignedElsewhere(taId, excludeLabId) {
+    if (taId === null || taId === undefined) return null;
+    const result = await query(
+        'SELECT name FROM labs WHERE ta_id = $1 AND id <> $2 LIMIT 1',
+        [taId, excludeLabId ?? 0]
+    );
+    return result.rowCount > 0 ? result.rows[0].name : null;
+}
+
 const SELECT_LAB_WITH_TA = `
     SELECT l.id, l.name, l.room_no, l.department, l.floor,
            l.pc_count, l.ta_id, l.created_at,
@@ -35,6 +47,15 @@ async function createLab(req, res) {
 
     const ta = await resolveTa(res, taId);
     if (ta === null) return;
+
+    if (ta.id !== null) {
+        const conflict = await taAssignedElsewhere(ta.id, null);
+        if (conflict) {
+            return res.status(409).json({
+                error: `This TA is already assigned to "${conflict}". A TA can only be assigned to one lab.`,
+            });
+        }
+    }
 
     try {
         const insert = await query(
@@ -83,6 +104,15 @@ async function updateLab(req, res) {
             const ta = await resolveTa(res, taId);
             if (ta === null) return;
             taIdToSet = ta.id;
+        }
+    }
+
+    if (touchTa && taIdToSet !== null && taIdToSet !== undefined) {
+        const conflict = await taAssignedElsewhere(taIdToSet, id);
+        if (conflict) {
+            return res.status(409).json({
+                error: `This TA is already assigned to "${conflict}". A TA can only be assigned to one lab.`,
+            });
         }
     }
 
