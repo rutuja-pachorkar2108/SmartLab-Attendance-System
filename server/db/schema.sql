@@ -34,10 +34,13 @@ CREATE TABLE IF NOT EXISTS courses (
     name            VARCHAR(255) NOT NULL,
     incharge_id     INT          REFERENCES users(id) ON DELETE RESTRICT,
     department_id   INT          REFERENCES departments(id) ON DELETE SET NULL,
+    -- FK to labs(id) is added after the labs table is created (see below).
+    lab_id          INT,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_courses_department ON courses(department_id);
+CREATE INDEX IF NOT EXISTS idx_courses_lab ON courses(lab_id);
 
 CREATE TABLE IF NOT EXISTS enrollments (
     id              SERIAL PRIMARY KEY,
@@ -94,7 +97,18 @@ CREATE TABLE IF NOT EXISTS labs (
 
 CREATE INDEX IF NOT EXISTS idx_labs_ta ON labs(ta_id);
 
--- Ad-hoc lab presence: students self-check-in / check-out.
+-- Link a practical (course) to the physical lab it runs in. Declared on courses
+-- above; the FK is added here now that labs exists. A lab hosts many practicals.
+DO $$ BEGIN
+    ALTER TABLE courses
+        ADD CONSTRAINT courses_lab_id_fkey
+        FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Lab presence: students self-check-in / check-out (source='manual'), OR an
+-- automatic visit recorded when a student marks practical attendance for a
+-- session held in this lab (source='practical', session_id set).
 CREATE TABLE IF NOT EXISTS lab_presence (
     id                SERIAL PRIMARY KEY,
     lab_id            INT          NOT NULL REFERENCES labs(id)  ON DELETE CASCADE,
@@ -102,6 +116,8 @@ CREATE TABLE IF NOT EXISTS lab_presence (
     checked_in_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     checked_out_at    TIMESTAMPTZ,
     ip_address        INET,
+    source            VARCHAR(20)  NOT NULL DEFAULT 'manual',
+    session_id        INT          REFERENCES sessions(id) ON DELETE SET NULL,
     CHECK (checked_out_at IS NULL OR checked_out_at > checked_in_at)
 );
 

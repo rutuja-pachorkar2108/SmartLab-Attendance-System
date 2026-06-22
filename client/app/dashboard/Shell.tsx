@@ -9,6 +9,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -78,10 +79,7 @@ export default function Shell({ children }: { children: ReactNode }) {
                 Profile
               </button>
               <button
-                onClick={() => {
-                  logout();
-                  router.replace("/login");
-                }}
+                onClick={() => setConfirmSignOut(true)}
                 className="rounded-md bg-white px-4 py-1.5 text-xs font-semibold transition hover:bg-violet-50"
                 style={{ color: "var(--color-primary)" }}
               >
@@ -93,6 +91,57 @@ export default function Shell({ children }: { children: ReactNode }) {
       </header>
 
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+
+      {confirmSignOut && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(33,8,61,0.55)" }}
+          onClick={() => setConfirmSignOut(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-lg overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="px-6 py-4 text-white font-bold text-lg tracking-tight"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 60%, var(--color-accent) 100%)",
+              }}
+            >
+              Sign out
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm" style={{ color: "var(--color-text)" }}>
+                Are you sure you want to sign out?
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmSignOut(false)}
+                  className="rounded-md border px-4 py-2 text-sm font-semibold transition hover:bg-violet-50"
+                  style={{
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-primary)",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmSignOut(false);
+                    logout();
+                    router.replace("/login");
+                  }}
+                  className="rounded-md px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                  style={{ backgroundColor: "var(--color-primary)" }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 w-full px-8 py-8 space-y-6">{children}</main>
 

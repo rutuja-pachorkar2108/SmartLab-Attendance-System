@@ -7,13 +7,14 @@ async function markAttendance(req, res) {
     if (Number.isNaN(sid)) return res.status(400).json({ error: 'Invalid session id' });
 
     const session = await query(
-        `SELECT s.id, s.course_id, s.scheduled_start, s.scheduled_end
+        `SELECT s.id, s.course_id, s.scheduled_start, s.scheduled_end, c.lab_id
          FROM sessions s
+         JOIN courses c ON c.id = s.course_id
          WHERE s.id = $1`,
         [sid]
     );
     if (session.rowCount === 0) return res.status(404).json({ error: 'Session not found' });
-    const { course_id, scheduled_start, scheduled_end } = session.rows[0];
+    const { course_id, scheduled_start, scheduled_end, lab_id } = session.rows[0];
 
     const now = new Date();
     if (now < new Date(scheduled_start)) {
@@ -31,6 +32,7 @@ async function markAttendance(req, res) {
         return res.status(403).json({ error: 'You are not enrolled in this course' });
     }
 
+    let attendanceRow;
     try {
         const insert = await query(
             `INSERT INTO attendance (session_id, student_id, ip_address, status)
@@ -38,13 +40,32 @@ async function markAttendance(req, res) {
              RETURNING id, session_id, student_id, marked_at, ip_address, status`,
             [sid, req.user.id, req.ip]
         );
-        return res.status(201).json({ attendance: insert.rows[0] });
+        attendanceRow = insert.rows[0];
     } catch (err) {
         if (err.code === '23505') {
             return res.status(409).json({ error: 'You have already marked attendance for this session' });
         }
         throw err;
     }
+
+    // Marking practical attendance also counts as lab presence for the lab's TA:
+    // record a completed visit spanning the practical window (now → session end).
+    // The lab is the one the practical's course is held in; skip if none is set.
+    // Best-effort — a presence-logging hiccup must not fail the attendance mark.
+    if (lab_id) {
+        try {
+            await query(
+                `INSERT INTO lab_presence
+                    (lab_id, student_id, checked_in_at, checked_out_at, ip_address, source, session_id)
+                 VALUES ($1, $2, NOW(), $3, $4, 'practical', $5)`,
+                [lab_id, req.user.id, scheduled_end, req.ip, sid]
+            );
+        } catch (err) {
+            console.error('Failed to record lab presence for practical attendance:', err);
+        }
+    }
+
+    return res.status(201).json({ attendance: attendanceRow });
 }
 
 // Incharge of the course or any TA: see who's marked + who hasn't.

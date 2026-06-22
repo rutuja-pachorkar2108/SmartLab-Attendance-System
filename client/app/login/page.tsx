@@ -76,7 +76,7 @@ export default function LoginPage() {
             <img
               src="/SNJB_Logo.jpg"
               alt="SNJB College logo"
-              className="h-32 w-32 object-contain mb-4"
+              className="h-44 w-44 object-contain mb-4"
               onError={() => setLogoFailed(true)}
             />
           )}

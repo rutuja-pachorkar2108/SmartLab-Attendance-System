@@ -108,10 +108,14 @@ async function listLabPresenceHistory(req, res) {
                 (p.checked_out_at IS NULL) AS is_active,
                 EXTRACT(EPOCH FROM (COALESCE(p.checked_out_at, NOW()) - p.checked_in_at))::int
                     AS duration_seconds,
+                p.source, p.session_id,
+                c.code AS course_code, c.name AS course_name,
                 u.id AS student_id, u.name AS student_name, u.roll_no,
                 u.class_name, u.div
          FROM lab_presence p
          JOIN users u ON u.id = p.student_id
+         LEFT JOIN sessions s ON s.id = p.session_id
+         LEFT JOIN courses  c ON c.id = s.course_id
          WHERE p.lab_id = $1${dateFilter}
          ORDER BY p.checked_in_at DESC
          LIMIT ${limit}`,

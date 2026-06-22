@@ -1,7 +1,7 @@
 const { query } = require('../config/db');
 
 async function createCourse(req, res) {
-    const { code, name, inchargeId, departmentId } = req.body || {};
+    const { code, name, inchargeId, departmentId, labId } = req.body || {};
     if (!code || !name) {
         return res.status(400).json({ error: 'code and name are required' });
     }
@@ -29,16 +29,23 @@ async function createCourse(req, res) {
         resolvedDepartmentId = dept.rows[0].id;
     }
 
+    let resolvedLabId = null;
+    if (labId) {
+        const lab = await query('SELECT id FROM labs WHERE id = $1', [parseInt(labId, 10)]);
+        if (lab.rowCount === 0) return res.status(404).json({ error: 'Lab not found' });
+        resolvedLabId = lab.rows[0].id;
+    }
+
     const dup = await query('SELECT id FROM courses WHERE code = $1', [code]);
     if (dup.rowCount > 0) {
         return res.status(409).json({ error: 'A course with this code already exists' });
     }
 
     const result = await query(
-        `INSERT INTO courses (code, name, incharge_id, department_id)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, code, name, incharge_id, department_id, created_at`,
-        [code, name, resolvedInchargeId, resolvedDepartmentId]
+        `INSERT INTO courses (code, name, incharge_id, department_id, lab_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, code, name, incharge_id, department_id, lab_id, created_at`,
+        [code, name, resolvedInchargeId, resolvedDepartmentId, resolvedLabId]
     );
     const created = result.rows[0];
 
@@ -68,7 +75,7 @@ async function updateCourse(req, res) {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid course id' });
 
-    const { code, name, inchargeId, departmentId } = req.body || {};
+    const { code, name, inchargeId, departmentId, labId } = req.body || {};
 
     const touchIncharge = Object.prototype.hasOwnProperty.call(req.body || {}, 'inchargeId');
     let resolvedInchargeId = null;
@@ -95,20 +102,30 @@ async function updateCourse(req, res) {
         resolvedDeptId = dept.rows[0].id;
     }
 
+    const touchLab = Object.prototype.hasOwnProperty.call(req.body || {}, 'labId');
+    let resolvedLabId = null;
+    if (touchLab && labId) {
+        const lab = await query('SELECT id FROM labs WHERE id = $1', [parseInt(labId, 10)]);
+        if (lab.rowCount === 0) return res.status(404).json({ error: 'Lab not found' });
+        resolvedLabId = lab.rows[0].id;
+    }
+
     try {
         const result = await query(
             `UPDATE courses SET
                 code          = COALESCE($2, code),
                 name          = COALESCE($3, name),
                 incharge_id   = CASE WHEN $5::bool THEN $4 ELSE incharge_id END,
-                department_id = CASE WHEN $7::bool THEN $6 ELSE department_id END
+                department_id = CASE WHEN $7::bool THEN $6 ELSE department_id END,
+                lab_id        = CASE WHEN $9::bool THEN $8 ELSE lab_id END
              WHERE id = $1
-             RETURNING id, code, name, incharge_id, department_id, created_at`,
+             RETURNING id, code, name, incharge_id, department_id, lab_id, created_at`,
             [
                 id,
                 code ?? null, name ?? null,
                 resolvedInchargeId, touchIncharge,
                 resolvedDeptId, touchDept,
+                resolvedLabId, touchLab,
             ]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Course not found' });
@@ -141,12 +158,14 @@ async function listCourses(req, res) {
     let params;
 
     if (role === 'admin') {
-        sql = `SELECT c.id, c.code, c.name, c.incharge_id, c.department_id, c.created_at,
+        sql = `SELECT c.id, c.code, c.name, c.incharge_id, c.department_id, c.lab_id, c.created_at,
                       u.name AS incharge_name, u.email AS incharge_email,
-                      d.name AS department_name
+                      d.name AS department_name,
+                      l.name AS lab_name, l.room_no AS lab_room_no
                FROM courses c
                LEFT JOIN users u       ON u.id = c.incharge_id
                LEFT JOIN departments d ON d.id = c.department_id
+               LEFT JOIN labs l        ON l.id = c.lab_id
                ORDER BY c.created_at DESC`;
         params = [];
     } else if (role === 'incharge') {
@@ -178,12 +197,14 @@ async function getCourse(req, res) {
     if (Number.isNaN(courseId)) return res.status(400).json({ error: 'Invalid course id' });
 
     const course = await query(
-        `SELECT c.id, c.code, c.name, c.incharge_id, c.department_id, c.created_at,
+        `SELECT c.id, c.code, c.name, c.incharge_id, c.department_id, c.lab_id, c.created_at,
                 u.name AS incharge_name, u.email AS incharge_email,
-                d.name AS department_name
+                d.name AS department_name,
+                l.name AS lab_name, l.room_no AS lab_room_no
          FROM courses c
          LEFT JOIN users u       ON u.id = c.incharge_id
          LEFT JOIN departments d ON d.id = c.department_id
+         LEFT JOIN labs l        ON l.id = c.lab_id
          WHERE c.id = $1`,
         [courseId]
     );

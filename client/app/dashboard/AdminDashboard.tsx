@@ -29,6 +29,9 @@ type Course = {
   incharge_email?: string | null;
   department_id: number | null;
   department_name?: string | null;
+  lab_id: number | null;
+  lab_name?: string | null;
+  lab_room_no?: string | null;
   created_at: string;
 };
 
@@ -524,6 +527,7 @@ function CoursesTab() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [incharges, setIncharges] = useState<AdminUser[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [labs, setLabs] = useState<Lab[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Course | null>(null);
@@ -533,14 +537,16 @@ function CoursesTab() {
     setLoading(true);
     setError(null);
     try {
-      const [courseData, inchargeData, deptData] = await Promise.all([
+      const [courseData, inchargeData, deptData, labData] = await Promise.all([
         api<{ courses: Course[] }>("/api/courses"),
         api<{ users: AdminUser[] }>("/api/users?role=incharge"),
         api<{ departments: Department[] }>("/api/departments"),
+        api<{ labs: Lab[] }>("/api/labs"),
       ]);
       setCourses(courseData.courses);
       setIncharges(inchargeData.users);
       setDepartments(deptData.departments);
+      setLabs(labData.labs);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load");
     } finally {
@@ -594,6 +600,7 @@ function CoursesTab() {
         editing={editing}
         incharges={incharges}
         departments={departments}
+        labs={labs}
         onCancel={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
@@ -622,6 +629,7 @@ function CoursesTab() {
                 <Th>Code</Th>
                 <Th>Name</Th>
                 <Th>Department</Th>
+                <Th>Lab</Th>
                 <Th>Assigned Course Incharge</Th>
                 <Th align="right">Actions</Th>
               </tr>
@@ -638,6 +646,11 @@ function CoursesTab() {
                   <Td mono>{c.code}</Td>
                   <Td bold>{c.name}</Td>
                   <Td muted>{c.department_name ?? "—"}</Td>
+                  <Td muted>
+                    {c.lab_name
+                      ? `${c.lab_name}${c.lab_room_no ? ` · ${c.lab_room_no}` : ""}`
+                      : "—"}
+                  </Td>
                   <Td>
                     <select
                       value={c.incharge_id ?? ""}
@@ -801,6 +814,14 @@ function CourseViewModal({
         />
         <DtDd label="Department" value={course.department_name ?? "—"} muted />
         <DtDd
+          label="Lab"
+          value={
+            course.lab_name
+              ? `${course.lab_name}${course.lab_room_no ? ` (Room ${course.lab_room_no})` : ""}`
+              : "— Not assigned —"
+          }
+        />
+        <DtDd
           label="Created at"
           value={new Date(course.created_at).toLocaleString()}
           muted
@@ -814,12 +835,14 @@ function CourseForm({
   editing,
   incharges,
   departments,
+  labs,
   onCancel,
   onSaved,
 }: {
   editing: Course | null;
   incharges: AdminUser[];
   departments: Department[];
+  labs: Lab[];
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -827,6 +850,7 @@ function CourseForm({
   const [name, setName] = useState("");
   const [inchargeId, setInchargeId] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string>("");
+  const [labId, setLabId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -838,12 +862,14 @@ function CourseForm({
       setName(editing.name);
       setInchargeId(editing.incharge_id ? String(editing.incharge_id) : "");
       setDepartmentId(editing.department_id ? String(editing.department_id) : "");
+      setLabId(editing.lab_id ? String(editing.lab_id) : "");
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } else {
       setCode("");
       setName("");
       setInchargeId("");
       setDepartmentId("");
+      setLabId("");
     }
     setError(null);
     setNotice(null);
@@ -860,6 +886,8 @@ function CourseForm({
         name,
         inchargeId: inchargeId === "" ? undefined : Number(inchargeId),
         departmentId: departmentId === "" ? undefined : Number(departmentId),
+        // Sent as null (not undefined) so editing can also un-assign a lab.
+        labId: labId === "" ? null : Number(labId),
       };
       if (editing) {
         await api(`/api/courses/${editing.id}`, {
@@ -947,7 +975,27 @@ function CourseForm({
               ))}
             </select>
           </Field>
+          <Field label="Lab (where this practical is held)">
+            <select
+              className={inputCls}
+              style={inputStyle}
+              value={labId}
+              onChange={(e) => setLabId(e.target.value)}
+            >
+              <option value="">— No lab —</option>
+              {labs.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name} · Room {l.room_no}
+                  {l.ta_name ? ` · TA: ${l.ta_name}` : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
+        <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+          💡 When a student marks attendance for this practical, it is recorded as
+          presence in the selected lab — visible to that lab&apos;s Teaching Assistant.
+        </p>
 
         {error && <ErrorBox msg={error} />}
         {notice && (
@@ -2273,7 +2321,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
           employeeId: employeeId.trim(),
           role,
           name: name.trim() || undefined,
-          department: role === "incharge" ? department || undefined : undefined,
+          department: department || undefined,
         }),
       });
       setEmployeeId("");
@@ -2312,7 +2360,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
           headers={["Employee ID", "Role", "Name", "Department"]}
           exampleRows={[
             ["E101", "incharge", "Prof. R. Roy", "Computer Engineering"],
-            ["T201", "ta", "Asst. Khan", ""],
+            ["T201", "ta", "Asst. Khan", "Computer Engineering"],
           ]}
           buildExportRows={() =>
             entries.map((e) => [
@@ -2365,25 +2413,21 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
               maxLength={60}
             />
           </Field>
-          {role === "incharge" ? (
-            <Field label="Department">
-              <select
-                className={inputCls}
-                style={inputStyle}
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-              >
-                <option value="">Select department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          ) : (
-            <div />
-          )}
+          <Field label="Department">
+            <select
+              className={inputCls}
+              style={inputStyle}
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+            >
+              <option value="">Select department</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </Field>
           <div className="sm:col-span-4">
             <button
               type="submit"
@@ -2758,7 +2802,7 @@ function StaffRosterEditModal({
         body: JSON.stringify({
           role,
           name: name.trim(),
-          department: role === "incharge" ? department || undefined : undefined,
+          department: department || undefined,
         }),
       });
       onSaved();
@@ -2802,23 +2846,21 @@ function StaffRosterEditModal({
             placeholder="Prof. R. Roy"
           />
         </Field>
-        {role === "incharge" && (
-          <Field label="Department">
-            <select
-              className={inputCls}
-              style={inputStyle}
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-            >
-              <option value="">Select department</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.name}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
+        <Field label="Department">
+          <select
+            className={inputCls}
+            style={inputStyle}
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          >
+            <option value="">Select department</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </Field>
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"
