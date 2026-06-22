@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useAutoDismiss } from "@/lib/useTimedErrors";
 
 const CLASS_OPTIONS = ["FE", "SE", "TE", "BE"] as const;
 
@@ -185,6 +186,7 @@ function EditForm({
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {

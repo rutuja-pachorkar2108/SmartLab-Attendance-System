@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useAutoDismiss } from "@/lib/useTimedErrors";
 
 type Lab = {
   id: number;
@@ -83,6 +84,7 @@ function LabPresencePanel() {
   const [loadingLabs, setLoadingLabs] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
 
   // Load labs once; default the selection to the lab this TA is assigned to.
   useEffect(() => {

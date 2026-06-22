@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { api, ApiError } from "@/lib/api";
 import { parseCsv, rowsToRecords } from "@/lib/csv";
 import { downloadXlsx, parseXlsxFile } from "@/lib/xlsx";
+import { useAutoDismiss } from "@/lib/useTimedErrors";
 
 type Role = "student" | "incharge" | "ta" | "admin";
 
@@ -39,6 +40,17 @@ type Department = {
   id: number;
   name: string;
 };
+
+// A course from the department catalog (seeded or admin-created), used to
+// populate the course picker in the New-practical form.
+type CatalogCourse = {
+  id: number;
+  code: string;
+  name: string;
+  department_id: number | null;
+};
+
+const ADD_NEW_COURSE = "__new__";
 
 type AdminUser = {
   id: number;
@@ -187,6 +199,7 @@ function LabsTab() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [editing, setEditing] = useState<Lab | null>(null);
   const [viewing, setViewing] = useState<Lab | null>(null);
 
@@ -376,6 +389,7 @@ function LabForm({
   const [taId, setTaId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const formRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -546,6 +560,7 @@ function CoursesTab() {
   const [labs, setLabs] = useState<Lab[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [editing, setEditing] = useState<Course | null>(null);
   const [viewing, setViewing] = useState<Course | null>(null);
 
@@ -867,10 +882,20 @@ function CourseForm({
   const [inchargeId, setInchargeId] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string>("");
   const [labId, setLabId] = useState<string>("");
+  // New-practical flow: pick a course from the department's catalog, or
+  // ADD_NEW_COURSE to type a brand-new one.
+  const [courseSel, setCourseSel] = useState<string>("");
+  const [catalog, setCatalog] = useState<CatalogCourse[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [notice, setNotice] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
+
+  const addingNew = courseSel === ADD_NEW_COURSE;
+  // Code/name inputs show when editing an existing course or adding a new one.
+  const showCourseFields = !!editing || addingNew;
 
   useEffect(() => {
     if (editing) {
@@ -886,43 +911,104 @@ function CourseForm({
       setInchargeId("");
       setDepartmentId("");
       setLabId("");
+      setCourseSel("");
     }
     setError(null);
     setNotice(null);
   }, [editing]);
 
+  // When the admin picks a department (in the New-practical flow), load that
+  // department's course catalog so they can choose from it or add a new course.
+  useEffect(() => {
+    if (editing) return;
+    setCourseSel("");
+    setCode("");
+    setName("");
+    if (!departmentId) {
+      setCatalog([]);
+      return;
+    }
+    let cancelled = false;
+    setCatalogLoading(true);
+    api<{ courses: CatalogCourse[] }>(
+      `/api/courses/catalog?department=${encodeURIComponent(departmentId)}`
+    )
+      .then((d) => {
+        if (!cancelled) setCatalog(d.courses);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [departmentId, editing]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setNotice(null);
+
+    // New-practical flow: the admin must pick a department, then either a
+    // catalog course or "Add a new course".
+    if (!editing) {
+      if (!departmentId) {
+        setError("Select a department first.");
+        return;
+      }
+      if (!courseSel) {
+        setError("Select a course, or choose “Add a new course”.");
+        return;
+      }
+    }
+
     setBusy(true);
     try {
-      const payload = {
-        code,
-        name,
-        inchargeId: inchargeId === "" ? undefined : Number(inchargeId),
-        departmentId: departmentId === "" ? undefined : Number(departmentId),
-        // Sent as null (not undefined) so editing can also un-assign a lab.
-        labId: labId === "" ? null : Number(labId),
-      };
       if (editing) {
         await api(`/api/courses/${editing.id}`, {
           method: "PATCH",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            code,
+            name,
+            inchargeId: inchargeId === "" ? undefined : Number(inchargeId),
+            departmentId: departmentId === "" ? undefined : Number(departmentId),
+            // Sent as null (not undefined) so editing can also un-assign a lab.
+            labId: labId === "" ? null : Number(labId),
+          }),
         });
         onSaved();
+      } else if (!addingNew) {
+        // Assign an existing catalog course to the chosen incharge / lab.
+        await api(`/api/courses/${courseSel}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            inchargeId: inchargeId === "" ? undefined : Number(inchargeId),
+            departmentId: Number(departmentId),
+            labId: labId === "" ? null : Number(labId),
+          }),
+        });
+        setNotice("✓ Practical assigned. Incharge and lab updated.");
+        onSaved();
       } else {
+        // Create a brand-new course not already in the catalog.
         const res = await api<{ autoEnrolled?: number }>("/api/courses", {
           method: "POST",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            code,
+            name,
+            inchargeId: inchargeId === "" ? undefined : Number(inchargeId),
+            departmentId: Number(departmentId),
+            labId: labId === "" ? null : Number(labId),
+          }),
         });
         const n = res?.autoEnrolled ?? 0;
         setNotice(
-          departmentId === ""
-            ? "✓ Course created. Tip: set a department to auto-enroll its students."
-            : n > 0
-              ? `✓ Course created — auto-enrolled ${n} student${n === 1 ? "" : "s"} from the selected department.`
-              : "✓ Course created. No students matched the selected department yet — new registrations in that department will need manual enrollment."
+          n > 0
+            ? `✓ Course created — auto-enrolled ${n} student${n === 1 ? "" : "s"} from the selected department.`
+            : "✓ Course created. No students matched the selected department yet — new registrations in that department will need manual enrollment."
         );
         onSaved();
       }
@@ -941,34 +1027,16 @@ function CourseForm({
     >
       <form onSubmit={submit} className="p-5 space-y-3">
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Course code *">
-            <input
-              required
-              className={inputCls}
-              style={inputStyle}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="e.g. CS-LAB-3"
-            />
-          </Field>
-          <Field label="Practical name *">
-            <input
-              required
-              className={inputCls}
-              style={inputStyle}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Database Management Lab"
-            />
-          </Field>
-          <Field label="Department">
+          <Field label="Department *">
             <select
               className={inputCls}
               style={inputStyle}
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
             >
-              <option value="">— No department —</option>
+              <option value="">
+                {editing ? "— No department —" : "— Select department —"}
+              </option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -976,6 +1044,73 @@ function CourseForm({
               ))}
             </select>
           </Field>
+
+          {!editing && (
+            <Field label="Course *">
+              <select
+                className={inputCls}
+                style={inputStyle}
+                value={courseSel}
+                disabled={!departmentId || catalogLoading}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCourseSel(v);
+                  if (v === ADD_NEW_COURSE) {
+                    setCode("");
+                    setName("");
+                  } else {
+                    const c = catalog.find((x) => String(x.id) === v);
+                    if (c) {
+                      setCode(c.code);
+                      setName(c.name);
+                    }
+                  }
+                }}
+              >
+                <option value="">
+                  {!departmentId
+                    ? "Select a department first"
+                    : catalogLoading
+                      ? "Loading courses…"
+                      : catalog.length === 0
+                        ? "No catalog courses yet — add a new one"
+                        : "Select a course"}
+                </option>
+                {catalog.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} — {c.name}
+                  </option>
+                ))}
+                <option value={ADD_NEW_COURSE}>➕ Add a new course…</option>
+              </select>
+            </Field>
+          )}
+
+          {showCourseFields && (
+            <>
+              <Field label="Course code *">
+                <input
+                  required
+                  className={inputCls}
+                  style={inputStyle}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="e.g. CS-LAB-3"
+                />
+              </Field>
+              <Field label="Practical name *">
+                <input
+                  required
+                  className={inputCls}
+                  style={inputStyle}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Database Management Lab"
+                />
+              </Field>
+            </>
+          )}
+
           <Field label="Course Incharge">
             <select
               className={inputCls}
@@ -1046,7 +1181,9 @@ function CourseForm({
               ? "Saving…"
               : editing
                 ? "Save changes"
-                : "Create & assign incharge"}
+                : addingNew
+                  ? "Create & assign incharge"
+                  : "Assign practical"}
           </button>
         </div>
       </form>
@@ -1063,6 +1200,7 @@ function UsersTab() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [viewingUser, setViewingUser] = useState<AdminUser | null>(null);
@@ -1298,6 +1436,7 @@ function ResetPasswordModal({
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1392,6 +1531,7 @@ function EditUserModal({
   const [employeeId, setEmployeeId] = useState(user.employee_id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1802,6 +1942,7 @@ type StaffRosterEntry = {
 
 function AccessTab() {
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
 
   return (
     <>

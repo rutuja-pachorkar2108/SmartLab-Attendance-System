@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, ApiError } from "@/lib/api";
+import { useAutoDismiss } from "@/lib/useTimedErrors";
 
 type Course = {
   id: number;
@@ -225,6 +226,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const rosterRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -1180,6 +1182,7 @@ function ScheduleSessionForm({
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -1287,6 +1290,7 @@ function EnrollForm({
   const [identifier, setIdentifier] = useState("");
   const [mode, setMode] = useState<"email" | "rollNo">("email");
   const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {

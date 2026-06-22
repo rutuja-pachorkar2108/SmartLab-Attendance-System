@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth, type Role } from "@/lib/auth";
+import { useAutoDismiss, useTimedFieldErrors } from "@/lib/useTimedErrors";
 
 type DepartmentOption = { id: number; name: string };
 type CourseOption = { id: number; code: string; name: string; department_id: number | null };
@@ -170,8 +171,13 @@ export default function RegisterPage() {
     return e;
   }, [name, email, password, role, department, className, prnNo, div, rollNo, employeeId, courses]);
 
-  const showErr = (k: FieldKey) =>
-    (touched[k] || submitAttempted) && errors[k] ? errors[k] : null;
+  const showErr = useTimedFieldErrors<FieldKey>(
+    errors,
+    (k) => !!(touched[k] || submitAttempted)
+  );
+
+  // Auto-dismiss the submit/server error banner after a few seconds.
+  useAutoDismiss(error, setError);
 
   const markTouched = (k: FieldKey) => setTouched((t) => ({ ...t, [k]: true }));
 
@@ -212,7 +218,9 @@ export default function RegisterPage() {
         prnNo: role === "student" ? prnNo.trim() : undefined,
         courses: role === "incharge" ? courses : undefined,
       });
-      router.replace("/dashboard");
+      // Account created but not logged in — send the user to the login page to
+      // sign in, which then routes them to their role's dashboard.
+      router.replace("/login?registered=1");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

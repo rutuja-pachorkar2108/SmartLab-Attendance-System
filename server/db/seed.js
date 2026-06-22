@@ -15,9 +15,67 @@ const USERS = [
     { name: 'Esha Iyer',   email: 's5@col.edu',      role: 'student',  roll_no: '22BCE005' },
 ];
 
-const COURSES = [
-    { code: 'CS-LAB-1', name: 'Data Structures Lab' },
-    { code: 'CS-LAB-2', name: 'Operating Systems Lab' },
+// Department -> official course catalog. The registration form lets a Course
+// Incharge pick a department and then check the courses (assigned by the
+// college) they teach; that picker reads from `courses` filtered by
+// department_id, so every course below is linked to its department here.
+//
+// Course codes are globally UNIQUE (see schema). The first two Computer
+// Engineering codes are kept as CS-LAB-1/CS-LAB-2 so re-seeding updates the
+// original demo rows (and back-fills their department_id) instead of orphaning
+// them. The first of these stays assigned to Prof. Roy for the demo sessions.
+const DEPARTMENTS = [
+    {
+        name: 'Computer Engineering',
+        courses: [
+            { code: 'CS-LAB-1', name: 'Data Structures Lab' },
+            { code: 'CS-LAB-2', name: 'Operating Systems Lab' },
+            { code: 'CO-DBL', name: 'Database Management Systems Lab' },
+            { code: 'CO-CNL', name: 'Computer Networks Lab' },
+            { code: 'CO-WTL', name: 'Web Technology Lab' },
+            { code: 'CO-MLL', name: 'Machine Learning Lab' },
+        ],
+    },
+    {
+        name: 'Information Technology',
+        courses: [
+            { code: 'IT-PPL', name: 'Python Programming Lab' },
+            { code: 'IT-DBL', name: 'Database Systems Lab' },
+            { code: 'IT-SEL', name: 'Software Engineering Lab' },
+            { code: 'IT-DSL', name: 'Data Science Lab' },
+            { code: 'IT-CCL', name: 'Cloud Computing Lab' },
+        ],
+    },
+    {
+        name: 'Electronics & Telecommunication',
+        courses: [
+            { code: 'ET-DEL', name: 'Digital Electronics Lab' },
+            { code: 'ET-MPL', name: 'Microprocessor Lab' },
+            { code: 'ET-SPL', name: 'Signal Processing Lab' },
+            { code: 'ET-VLL', name: 'VLSI Design Lab' },
+            { code: 'ET-CSL', name: 'Communication Systems Lab' },
+        ],
+    },
+    {
+        name: 'Mechanical Engineering',
+        courses: [
+            { code: 'ME-TDL', name: 'Thermodynamics Lab' },
+            { code: 'ME-CAD', name: 'CAD / CAM Lab' },
+            { code: 'ME-MPL', name: 'Manufacturing Process Lab' },
+            { code: 'ME-FML', name: 'Fluid Mechanics Lab' },
+            { code: 'ME-TOM', name: 'Theory of Machines Lab' },
+        ],
+    },
+    {
+        name: 'Civil Engineering',
+        courses: [
+            { code: 'CE-SUL', name: 'Surveying Lab' },
+            { code: 'CE-CTL', name: 'Concrete Technology Lab' },
+            { code: 'CE-GTL', name: 'Geotechnical Engineering Lab' },
+            { code: 'CE-EEL', name: 'Environmental Engineering Lab' },
+            { code: 'CE-SAL', name: 'Structural Analysis Lab' },
+        ],
+    },
 ];
 
 const LABS = [
@@ -52,15 +110,27 @@ async function upsertUser(u, hash) {
     return result.rows[0];
 }
 
-async function upsertCourse(c, inchargeId) {
+async function upsertDepartment(name) {
     const result = await pool.query(
-        `INSERT INTO courses (code, name, incharge_id)
-         VALUES ($1, $2, $3)
+        `INSERT INTO departments (name)
+         VALUES ($1)
+         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id, name`,
+        [name]
+    );
+    return result.rows[0];
+}
+
+async function upsertCourse(c, inchargeId, departmentId) {
+    const result = await pool.query(
+        `INSERT INTO courses (code, name, incharge_id, department_id)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT (code) DO UPDATE
             SET name = EXCLUDED.name,
-                incharge_id = EXCLUDED.incharge_id
-         RETURNING id, code`,
-        [c.code, c.name, inchargeId]
+                incharge_id = EXCLUDED.incharge_id,
+                department_id = EXCLUDED.department_id
+         RETURNING id, code, department_id`,
+        [c.code, c.name, inchargeId, departmentId]
     );
     return result.rows[0];
 }
@@ -117,10 +187,25 @@ async function main() {
     const ta = created.find((u) => u.role === 'ta');
     const students = created.filter((u) => u.role === 'student');
 
+    // Seed each department and its official course catalog. Only the two
+    // original Computer Engineering demo labs (CS-LAB-1/CS-LAB-2) get assigned
+    // to Prof. Roy and have students enrolled; the rest of the catalog is left
+    // unassigned so it appears in the registration picker for incharges to
+    // claim, exactly as the college authority would have set it up.
+    const DEMO_COURSE_CODES = new Set(['CS-LAB-1', 'CS-LAB-2']);
     const courses = [];
-    for (const c of COURSES) courses.push(await upsertCourse(c, incharge.id));
+    const demoCourses = [];
+    for (const dept of DEPARTMENTS) {
+        const department = await upsertDepartment(dept.name);
+        for (const c of dept.courses) {
+            const isDemo = DEMO_COURSE_CODES.has(c.code);
+            const course = await upsertCourse(c, isDemo ? incharge.id : null, department.id);
+            courses.push({ ...course, department: department.name });
+            if (isDemo) demoCourses.push(course);
+        }
+    }
 
-    for (const c of courses) {
+    for (const c of demoCourses) {
         for (const s of students) await enroll(s.id, c.id);
     }
 
@@ -140,15 +225,15 @@ async function main() {
     const upEnd     = new Date(upStart.getTime() + 2 * 60 * 60 * 1000);
 
     const liveSession = await scheduleSession(
-        courses[0].id, incharge.id, liveStart, liveEnd, 'Live demo session (seeded)'
+        demoCourses[0].id, incharge.id, liveStart, liveEnd, 'Live demo session (seeded)'
     );
     const upSession = await scheduleSession(
-        courses[0].id, incharge.id, upStart, upEnd, 'Upcoming session (seeded)'
+        demoCourses[0].id, incharge.id, upStart, upEnd, 'Upcoming session (seeded)'
     );
 
     console.log('Seed complete. All passwords are:', PASSWORD);
     console.table(created.map((u) => ({ email: u.email, role: u.role })));
-    console.table(courses.map((c) => ({ code: c.code, id: c.id })));
+    console.table(courses.map((c) => ({ code: c.code, course: c.id, department: c.department })));
     console.table(labs.map((l) => ({ room: l.room_no, name: l.name, id: l.id })));
     console.table([
         { kind: 'live',     id: liveSession.id, start: liveSession.scheduled_start, end: liveSession.scheduled_end },

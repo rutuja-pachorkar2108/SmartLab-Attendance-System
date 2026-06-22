@@ -97,13 +97,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }, []);
 
+  // Registration intentionally does NOT log the user in. After creating the
+  // account the user is sent to the login page to sign in, which then routes
+  // them to their role's dashboard. We ignore the token the API returns here.
   const register = useCallback(async (input: RegisterInput) => {
-    const data = await api<{ token: string; user: User }>(
-      "/api/auth/register",
-      { method: "POST", body: JSON.stringify(input) }
-    );
-    setToken(data.token);
-    setUser(data.user);
+    await api<{ token: string; user: User }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }, []);
 
   const updateProfile = useCallback(async (input: UpdateProfileInput) => {

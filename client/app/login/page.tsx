@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useAutoDismiss, useTimedFieldErrors } from "@/lib/useTimedErrors";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -18,10 +19,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [justRegistered, setJustRegistered] = useState(false);
 
   useEffect(() => {
     if (!loading && user) router.replace("/dashboard");
   }, [loading, user, router]);
+
+  // Show a confirmation when the user arrives here right after registering.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("registered") === "1") {
+      setJustRegistered(true);
+    }
+  }, []);
 
   const errors = useMemo(() => {
     const e: { email?: string; password?: string } = {};
@@ -32,8 +41,15 @@ export default function LoginPage() {
     return e;
   }, [email, password]);
 
-  const emailErr = (touched.email || submitAttempted) ? errors.email : null;
-  const passwordErr = (touched.password || submitAttempted) ? errors.password : null;
+  const showErr = useTimedFieldErrors<"email" | "password">(
+    errors,
+    (k) => !!(touched[k] || submitAttempted)
+  );
+  const emailErr = showErr("email");
+  const passwordErr = showErr("password");
+
+  // Auto-dismiss the submit/server error banner after a few seconds.
+  useAutoDismiss(error, setError);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +159,12 @@ export default function LoginPage() {
               <p className="text-xs text-rose-600 mt-1">{passwordErr}</p>
             ) : null}
           </div>
+
+          {justRegistered && !error && (
+            <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-100 px-4 py-3 text-sm text-emerald-700">
+              Account created successfully — please sign in to continue.
+            </div>
+          )}
 
           {error && (
             <div className="rounded-2xl bg-rose-50 border-2 border-rose-100 px-4 py-3 text-sm text-rose-700">

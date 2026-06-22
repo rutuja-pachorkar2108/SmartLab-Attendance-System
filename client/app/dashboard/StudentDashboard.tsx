@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useAutoDismiss } from "@/lib/useTimedErrors";
 
 type ActiveSession = {
   id: number;
@@ -82,6 +83,10 @@ export default function StudentDashboard() {
     kind: "ok" | "err";
     msg: string;
   } | null>(null);
+
+  // Auto-dismiss the transient feedback banners after a few seconds.
+  useAutoDismiss(feedback, setFeedback);
+  useAutoDismiss(labFeedback, setLabFeedback);
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
