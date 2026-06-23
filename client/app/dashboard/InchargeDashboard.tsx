@@ -9,6 +9,7 @@ import {
 } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
+import { useViewAll } from "@/lib/useViewAll";
 
 type Course = {
   id: number;
@@ -294,14 +295,6 @@ function CourseDetail({ courseId }: { courseId: number }) {
     }
   }
 
-  if (loading) {
-    return (
-      <Section title="Loading" emoji="⏳">
-        <Loading />
-      </Section>
-    );
-  }
-
   const live = sessions.find((x) => x.is_live) ?? null;
   const upcoming = sessions.filter((x) => !x.is_live && !x.is_past).sort(
     (a, b) =>
@@ -364,6 +357,22 @@ function CourseDetail({ courseId }: { courseId: number }) {
       (!classFilter || s.class_name === classFilter) &&
       (!divFilter || s.div === divFilter)
   );
+
+  // Cap the lists that grow over a course's life behind "View all" toggles.
+  const { visible: visiblePast, toggle: pastToggle } = useViewAll(past);
+  const { visible: visibleRoster, toggle: rosterToggle } = useViewAll(
+    roster ?? []
+  );
+  const { visible: visibleStudentRows, toggle: studentsToggle } =
+    useViewAll(visibleStudents);
+
+  if (loading) {
+    return (
+      <Section title="Loading" emoji="⏳">
+        <Loading />
+      </Section>
+    );
+  }
 
   return (
     <>
@@ -482,7 +491,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
           />
         ) : (
           <ul className="divide-y" style={{ borderColor: "var(--color-border)" }}>
-            {past.map((s) => {
+            {visiblePast.map((s) => {
               const meta = summary?.sessions.find((x) => x.id === s.id);
               return (
                 <li
@@ -528,6 +537,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
             })}
           </ul>
         )}
+        {pastToggle}
       </Section>
 
       {/* Student attendance visualization */}
@@ -874,7 +884,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
               </tr>
             </thead>
             <tbody>
-              {roster.map((r, i) => (
+              {visibleRoster.map((r, i) => (
                 <tr
                   key={r.student_id}
                   style={{
@@ -917,6 +927,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
               ))}
             </tbody>
           </table>
+          {rosterToggle}
         </Section>
         </div>
       )}
@@ -1048,7 +1059,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleStudents.map((s, i) => (
+                    {visibleStudentRows.map((s, i) => (
                       <tr
                         key={s.id}
                         style={{
@@ -1074,6 +1085,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
                     ))}
                   </tbody>
                 </table>
+                {studentsToggle}
               </div>
             )}
           </>

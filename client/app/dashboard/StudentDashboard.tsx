@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
+import { useViewAll } from "@/lib/useViewAll";
 
 type ActiveSession = {
   id: number;
@@ -32,6 +33,11 @@ type Lab = {
   department: string | null;
   floor: string | null;
   pc_count: number;
+};
+
+type Department = {
+  id: number;
+  name: string;
 };
 
 type CurrentPresence = {
@@ -69,6 +75,9 @@ export default function StudentDashboard() {
   const [upcoming, setUpcoming] = useState<UpcomingSession[]>([]);
   const [summary, setSummary] = useState<CourseSummary[]>([]);
   const [labs, setLabs] = useState<Lab[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const [selectedLabId, setSelectedLabId] = useState<number | null>(null);
   const [current, setCurrent] = useState<CurrentPresence | null>(null);
   const [history, setHistory] = useState<PresenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,11 +100,12 @@ export default function StudentDashboard() {
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [a, u, s, l, c, h] = await Promise.all([
+      const [a, u, s, l, d, c, h] = await Promise.all([
         api<{ sessions: ActiveSession[] }>("/api/sessions/active"),
         api<{ sessions: UpcomingSession[] }>("/api/sessions/upcoming"),
         api<{ courses: CourseSummary[] }>("/api/attendance/me"),
         api<{ labs: Lab[] }>("/api/labs"),
+        api<{ departments: Department[] }>("/api/departments"),
         api<{ current: CurrentPresence | null }>("/api/lab-presence/me/current"),
         api<{ history: PresenceRecord[] }>("/api/lab-presence/me/history"),
       ]);
@@ -103,6 +113,7 @@ export default function StudentDashboard() {
       setUpcoming(u.sessions);
       setSummary(s.courses);
       setLabs(l.labs);
+      setDepartments(d.departments);
       setCurrent(c.current);
       setHistory(h.history);
     } finally {
@@ -117,6 +128,31 @@ export default function StudentDashboard() {
     const interval = setInterval(() => refresh(true), 30000);
     return () => clearInterval(interval);
   }, [refresh]);
+
+  // Labs belonging to the chosen department (matched by department name).
+  const labsInDept = labs.filter((l) => l.department === selectedDept);
+
+  // Keep the department selection valid: default to the first admin-defined
+  // department, and reset if the chosen one no longer exists.
+  useEffect(() => {
+    setSelectedDept((prev) =>
+      prev != null && departments.some((d) => d.name === prev)
+        ? prev
+        : departments[0]?.name ?? null
+    );
+  }, [departments]);
+
+  // Keep the lab selection valid within the chosen department: default to the
+  // first lab, and reset when the department changes or the lab disappears.
+  useEffect(() => {
+    setSelectedLabId((prev) =>
+      prev != null && labsInDept.some((l) => l.id === prev)
+        ? prev
+        : labsInDept[0]?.id ?? null
+    );
+    // labsInDept is derived from labs + selectedDept; depend on those.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labs, selectedDept]);
 
   // Guard against showing a session as LIVE in the gap between it ending and
   // the next background refresh. Re-evaluated every 15s.
@@ -192,6 +228,9 @@ export default function StudentDashboard() {
   })();
 
   const firstName = user?.name.split(" ")[0] ?? "there";
+
+  // Cap the visit history; it grows with every check-in.
+  const { visible: visibleHistory, toggle: historyToggle } = useViewAll(history);
 
   return (
     <>
@@ -287,45 +326,88 @@ export default function StudentDashboard() {
             sub="Wait for an admin to add labs."
           />
         ) : (
-          <ul className="divide-y" style={{ borderColor: "var(--color-border)" }}>
-            {labs.map((l) => (
-              <li
-                key={l.id}
-                className="px-5 py-3 flex items-center justify-between gap-4 flex-wrap"
-              >
-                <div className="min-w-0">
-                  <div className="font-semibold" style={{ color: "var(--color-text)" }}>
-                    {l.name}
+          (() => {
+            const selectedLab =
+              labsInDept.find((l) => l.id === selectedLabId) ?? null;
+            return (
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <label className="block space-y-1 flex-1">
                     <span
-                      className="ml-2 rounded-md px-2 py-0.5 text-xs font-bold"
-                      style={{
-                        backgroundColor: "var(--color-surface-alt)",
-                        color: "var(--color-primary)",
-                      }}
+                      className="text-xs font-bold uppercase tracking-wider"
+                      style={{ color: "var(--color-muted)" }}
                     >
-                      Room {l.room_no}
+                      Select a department
                     </span>
-                  </div>
-                  <div className="text-xs mt-1" style={{ color: "var(--color-muted)" }}>
-                    {[l.floor && `${l.floor} floor`, l.department]
+                    <select
+                      value={selectedDept ?? ""}
+                      onChange={(e) =>
+                        setSelectedDept(e.target.value || null)
+                      }
+                      className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-violet-200"
+                      style={{ borderColor: "var(--color-border)" }}
+                    >
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.name}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block space-y-1 flex-1">
+                    <span
+                      className="text-xs font-bold uppercase tracking-wider"
+                      style={{ color: "var(--color-muted)" }}
+                    >
+                      Select a lab
+                    </span>
+                    <select
+                      value={selectedLabId ?? ""}
+                      onChange={(e) =>
+                        setSelectedLabId(
+                          e.target.value ? Number(e.target.value) : null
+                        )
+                      }
+                      className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-violet-200"
+                      style={{ borderColor: "var(--color-border)" }}
+                      disabled={labsInDept.length === 0}
+                    >
+                      {labsInDept.length === 0 ? (
+                        <option value="">No labs in this department</option>
+                      ) : (
+                        labsInDept.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name} · Room {l.room_no}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+                </div>
+                {selectedLab && (
+                  <div className="text-xs" style={{ color: "var(--color-muted)" }}>
+                    {[
+                      selectedLab.floor && `${selectedLab.floor} floor`,
+                      selectedLab.department,
+                      `PCs ${selectedLab.pc_count || "—"}`,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </div>
-                  <div className="text-xs mt-1" style={{ color: "var(--color-muted)" }}>
-                    PCs {l.pc_count || "—"}
-                  </div>
-                </div>
+                )}
                 <button
-                  onClick={() => checkIn(l.id)}
-                  disabled={labBusy === l.id}
+                  onClick={() =>
+                    selectedLabId != null && checkIn(selectedLabId)
+                  }
+                  disabled={selectedLabId == null || labBusy === selectedLabId}
                   className={primaryBtnCls}
                   style={{ backgroundColor: "var(--color-success)" }}
                 >
-                  {labBusy === l.id ? "Checking in…" : "Check in"}
+                  {labBusy === selectedLabId ? "Checking in…" : "Check in"}
                 </button>
-              </li>
-            ))}
-          </ul>
+              </div>
+            );
+          })()
         )}
       </Section>
 
@@ -474,6 +556,7 @@ export default function StudentDashboard() {
         {history.length === 0 ? (
           <Empty emoji="📭" title="No lab visits yet" sub="Your check-ins will appear here." />
         ) : (
+          <>
           <table className="w-full text-sm">
             <thead>
               <tr style={{ backgroundColor: "var(--color-surface-alt)" }}>
@@ -484,7 +567,7 @@ export default function StudentDashboard() {
               </tr>
             </thead>
             <tbody>
-              {history.map((h, i) => (
+              {visibleHistory.map((h, i) => (
                 <tr
                   key={h.id}
                   style={{
@@ -509,6 +592,8 @@ export default function StudentDashboard() {
               ))}
             </tbody>
           </table>
+          {historyToggle}
+          </>
         )}
       </Section>
     </>

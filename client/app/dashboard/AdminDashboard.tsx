@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { parseCsv, rowsToRecords } from "@/lib/csv";
 import { downloadXlsx, parseXlsxFile } from "@/lib/xlsx";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
+import { useViewAll } from "@/lib/useViewAll";
 
 type Role = "student" | "incharge" | "ta" | "admin";
 
@@ -202,6 +203,7 @@ function LabsTab() {
   useAutoDismiss(error, setError);
   const [editing, setEditing] = useState<Lab | null>(null);
   const [viewing, setViewing] = useState<Lab | null>(null);
+  const { visible: visibleLabs, toggle: labsToggle } = useViewAll(labs);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -288,7 +290,7 @@ function LabsTab() {
               </tr>
             </thead>
             <tbody>
-              {labs.map((l, i) => (
+              {visibleLabs.map((l, i) => (
                 <tr
                   key={l.id}
                   style={{
@@ -332,6 +334,7 @@ function LabsTab() {
               ))}
             </tbody>
           </table>
+          {labsToggle}
           </div>
         )}
       </Section>
@@ -563,6 +566,7 @@ function CoursesTab() {
   useAutoDismiss(error, setError);
   const [editing, setEditing] = useState<Course | null>(null);
   const [viewing, setViewing] = useState<Course | null>(null);
+  const { visible: visibleCourses, toggle: coursesToggle } = useViewAll(courses);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -666,7 +670,7 @@ function CoursesTab() {
               </tr>
             </thead>
             <tbody>
-              {courses.map((c, i) => (
+              {visibleCourses.map((c, i) => (
                 <tr
                   key={c.id}
                   style={{
@@ -710,6 +714,7 @@ function CoursesTab() {
               ))}
             </tbody>
           </table>
+          {coursesToggle}
           </div>
         )}
       </Section>
@@ -1204,6 +1209,7 @@ function UsersTab() {
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [viewingUser, setViewingUser] = useState<AdminUser | null>(null);
+  const { visible: visibleUsers, toggle: usersToggle } = useViewAll(users);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1295,7 +1301,7 @@ function UsersTab() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u, i) => (
+              {visibleUsers.map((u, i) => (
                 <tr
                   key={u.id}
                   style={{
@@ -1320,6 +1326,7 @@ function UsersTab() {
               ))}
             </tbody>
           </table>
+          {usersToggle}
           </div>
         )}
       </Section>
@@ -2158,6 +2165,7 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<RosterEntry | null>(null);
   const [editing, setEditing] = useState<RosterEntry | null>(null);
+  const { visible: visibleEntries, toggle: entriesToggle } = useViewAll(entries);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -2351,7 +2359,7 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e, i) => (
+              {visibleEntries.map((e, i) => (
                 <tr
                   key={e.id}
                   style={{
@@ -2403,6 +2411,7 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
               ))}
             </tbody>
           </table>
+          {entriesToggle}
           </div>
         )}
       </div>
@@ -2445,6 +2454,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<StaffRosterEntry | null>(null);
   const [editing, setEditing] = useState<StaffRosterEntry | null>(null);
+  const { visible: visibleEntries, toggle: entriesToggle } = useViewAll(entries);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -2619,7 +2629,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
               </tr>
             </thead>
             <tbody>
-              {entries.map((e, i) => (
+              {visibleEntries.map((e, i) => (
                 <tr
                   key={e.id}
                   style={{
@@ -2670,6 +2680,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
               ))}
             </tbody>
           </table>
+          {entriesToggle}
           </div>
         )}
       </div>

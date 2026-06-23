@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
+import { useViewAll } from "@/lib/useViewAll";
 
 type Lab = {
   id: number;
@@ -135,6 +136,9 @@ function LabPresencePanel() {
 
   const selectedLab = labs.find((l) => l.id === labId) ?? null;
   const isMyLab = selectedLab?.ta_id === user?.id;
+
+  // The visit history grows with every check-in — cap it behind a "View all".
+  const { visible: visibleHistory, toggle: historyToggle } = useViewAll(history);
 
   return (
     <Section
@@ -278,14 +282,13 @@ function LabPresencePanel() {
                       <Th>Roll No</Th>
                       <Th>Name</Th>
                       <Th>Class</Th>
-                      <Th>Source</Th>
                       <Th>Checked in</Th>
                       <Th>Checked out</Th>
                       <Th align="right">Duration</Th>
                     </tr>
                   </thead>
                   <tbody>
-                    {history.map((h, i) => (
+                    {visibleHistory.map((h, i) => (
                       <tr
                         key={h.id}
                         style={{
@@ -297,38 +300,6 @@ function LabPresencePanel() {
                         <Td muted>
                           {h.class_name ?? "—"}
                           {h.div ? `-${h.div}` : ""}
-                        </Td>
-                        <Td>
-                          {h.source === "practical" ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                              style={{
-                                backgroundColor:
-                                  "color-mix(in srgb, var(--color-accent) 14%, white)",
-                                color: "var(--color-accent)",
-                              }}
-                              title={
-                                h.course_code
-                                  ? `Marked attendance for ${h.course_code}${
-                                      h.course_name ? ` — ${h.course_name}` : ""
-                                    }`
-                                  : "Recorded from a practical attendance mark"
-                              }
-                            >
-                              📝 Practical
-                              {h.course_code ? ` · ${h.course_code}` : ""}
-                            </span>
-                          ) : (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                              style={{
-                                backgroundColor: "var(--color-surface-alt)",
-                                color: "var(--color-muted)",
-                              }}
-                            >
-                              🚶 Walk-in
-                            </span>
-                          )}
                         </Td>
                         <Td muted>{new Date(h.checked_in_at).toLocaleString()}</Td>
                         <Td muted>
@@ -353,6 +324,7 @@ function LabPresencePanel() {
                     ))}
                   </tbody>
                 </table>
+                {historyToggle}
               </div>
             )}
           </div>

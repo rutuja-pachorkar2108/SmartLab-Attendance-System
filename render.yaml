@@ -19,7 +19,10 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: npm install
+    # Installs deps, then bootstraps the database on the FIRST deploy only.
+    # db:deploy is guarded — it seeds an empty DB and safely no-ops afterwards,
+    # so redeploys never wipe data. No manual shell step needed.
+    buildCommand: npm install && npm run db:deploy
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -42,12 +45,13 @@ services:
         value: 12h
       - key: BCRYPT_ROUNDS
         value: "10"
-      # College-network gate. YOU must set this to your college's real public
-      # IP / CIDR in the Render dashboard, e.g. 203.0.113.5/32
-      # (find it by visiting whatismyip.com on the college network).
-      # Until you set a real value, attendance marking will be blocked.
+      # Network gate for marking attendance. Open to everyone (IPv4 + IPv6) so
+      # anyone on any network can use the app — good for public testing.
+      # To later restrict to your college Wi-Fi, change this in the Render
+      # dashboard to your campus public CIDR(s), e.g. 203.0.113.5/32
+      # (find it via whatismyip.com on the college network).
       - key: ALLOWED_CIDRS
-        sync: false
+        value: "0.0.0.0/0,::/0"
       # CORS — auth is header-based (no cookies), so "*" is safe.
       - key: CLIENT_ORIGIN
         value: "*"
