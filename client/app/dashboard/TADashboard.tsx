@@ -5,6 +5,14 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
 import { useViewAll } from "@/lib/useViewAll";
+import { DashTabs, type TabDef } from "./Tabs";
+
+type TaTab = "in" | "history";
+
+const TA_TABS: TabDef<TaTab>[] = [
+  { id: "in", emoji: "🟢", label: "Currently in Lab" },
+  { id: "history", emoji: "🕓", label: "Visit History" },
+];
 
 type Lab = {
   id: number;
@@ -82,6 +90,7 @@ function LabPresencePanel() {
   const [active, setActive] = useState<ActivePresence[]>([]);
   const [history, setHistory] = useState<PresenceHistory[]>([]);
   const [date, setDate] = useState("");
+  const [tab, setTab] = useState<TaTab>("in");
   const [loadingLabs, setLoadingLabs] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,7 +226,10 @@ function LabPresencePanel() {
             )}
           </div>
 
+          <DashTabs tabs={TA_TABS} active={tab} onChange={setTab} />
+
           {/* Currently in the lab */}
+          {tab === "in" && (
           <div>
             <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>
               Currently in lab
@@ -259,7 +271,10 @@ function LabPresencePanel() {
             )}
           </div>
 
+          )}
+
           {/* Visit history */}
+          {tab === "history" && (
           <div>
             <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>
               Visit history{date ? ` — ${new Date(date).toLocaleDateString()}` : ""}
@@ -328,6 +343,7 @@ function LabPresencePanel() {
               </div>
             )}
           </div>
+          )}
         </div>
       )}
     </Section>

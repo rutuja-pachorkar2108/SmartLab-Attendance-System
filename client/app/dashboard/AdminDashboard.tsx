@@ -6,6 +6,7 @@ import { parseCsv, rowsToRecords } from "@/lib/csv";
 import { downloadXlsx, parseXlsxFile } from "@/lib/xlsx";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
 import { useViewAll } from "@/lib/useViewAll";
+import { DashTabs, type TabDef } from "./Tabs";
 
 type Role = "student" | "incharge" | "ta" | "admin";
 
@@ -76,18 +77,29 @@ const primaryBtnCls =
   "rounded-md px-4 py-2 text-sm font-bold text-white shadow-sm transition disabled:opacity-50 active:scale-[0.98]";
 const primaryBtnStyle = { backgroundColor: "var(--color-primary)" } as const;
 
-type Tab = "labs" | "courses" | "users" | "access";
+type Tab =
+  | "new-lab"
+  | "labs"
+  | "departments"
+  | "new-practical"
+  | "practicals"
+  | "users"
+  | "student-access"
+  | "staff-access";
 
-const ADMIN_NAV: { id: Tab; emoji: string; label: string }[] = [
-  { id: "labs", emoji: "🏢", label: "Labs & TA assignments" },
-  { id: "courses", emoji: "📘", label: "Practicals & Course Incharges" },
-  { id: "users", emoji: "👥", label: "Users & password resets" },
-  { id: "access", emoji: "🔐", label: "Registration access" },
+const ADMIN_TABS: TabDef<Tab>[] = [
+  { id: "new-lab", emoji: "✨", label: "New Lab" },
+  { id: "labs", emoji: "🏢", label: "Labs" },
+  { id: "departments", emoji: "🏛️", label: "Departments" },
+  { id: "new-practical", emoji: "➕", label: "New Practical" },
+  { id: "practicals", emoji: "📘", label: "Practicals" },
+  { id: "users", emoji: "👥", label: "Users" },
+  { id: "student-access", emoji: "🎓", label: "Student Enrollment" },
+  { id: "staff-access", emoji: "🧑‍🏫", label: "Staff Enrollment" },
 ];
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("labs");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="space-y-4">
@@ -105,96 +117,29 @@ export default function AdminDashboard() {
         </p>
       </section>
 
-      <button
-        onClick={() => setSidebarOpen((o) => !o)}
-        aria-label={sidebarOpen ? "Hide menu" : "Show menu"}
-        aria-expanded={sidebarOpen}
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-sm transition"
-        style={{
-          backgroundColor: "var(--color-surface)",
-          color: "var(--color-primary)",
-          border: "1px solid var(--color-border)",
-        }}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          className="h-5 w-5"
-        >
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-        Menu
-      </button>
+      <DashTabs tabs={ADMIN_TABS} active={tab} onChange={setTab} />
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {sidebarOpen && (
-        <aside className="shrink-0 space-y-3 lg:sticky lg:top-6 lg:w-80">
-        <nav className="space-y-2">
-          {ADMIN_NAV.map((n) => (
-            <SideNavButton
-              key={n.id}
-              active={tab === n.id}
-              onClick={() => setTab(n.id)}
-              emoji={n.emoji}
-            >
-              {n.label}
-            </SideNavButton>
-          ))}
-        </nav>
-        </aside>
+      <div className="min-w-0 space-y-6">
+        {/* LabsTab owns the shared lab state; keep one instance mounted across
+            its two cards (New Lab form + Labs list) so editing carries over. */}
+        {(tab === "new-lab" || tab === "labs") && (
+          <LabsTab tab={tab} setTab={setTab} />
         )}
-
-        <div className="min-w-0 flex-1 space-y-6">
-          {tab === "labs" && <LabsTab />}
-          {tab === "courses" && <CoursesTab />}
-          {tab === "users" && <UsersTab />}
-          {tab === "access" && <AccessTab />}
-        </div>
+        {/* CoursesTab owns shared course/department state across its three cards. */}
+        {(tab === "departments" ||
+          tab === "new-practical" ||
+          tab === "practicals") && <CoursesTab tab={tab} setTab={setTab} />}
+        {tab === "users" && <UsersTab />}
+        {tab === "student-access" && <StudentAccessTab />}
+        {tab === "staff-access" && <StaffAccessTab />}
       </div>
     </div>
   );
 }
 
-function SideNavButton({
-  active,
-  onClick,
-  emoji,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  emoji: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg px-4 py-3.5 text-left text-base font-bold shadow-sm transition"
-      style={
-        active
-          ? { backgroundColor: "var(--color-primary)", color: "white" }
-          : {
-              backgroundColor: "var(--color-surface)",
-              color: "var(--color-primary)",
-              border: "1px solid var(--color-border)",
-            }
-      }
-    >
-      <span className="text-xl">{emoji}</span>
-      <span className="leading-tight">{children}</span>
-    </button>
-  );
-}
-
 // ---------- LABS TAB ----------
 
-function LabsTab() {
+function LabsTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const [labs, setLabs] = useState<Lab[]>([]);
   const [tas, setTas] = useState<AdminUser[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -255,17 +200,24 @@ function LabsTab() {
     <>
       {error && <ErrorBox msg={error} />}
 
+      {tab === "new-lab" && (
       <LabForm
         editing={editing}
         tas={tas}
         departments={departments}
-        onCancel={() => setEditing(null)}
+        onCancel={() => {
+          setEditing(null);
+          setTab("labs");
+        }}
         onSaved={() => {
           setEditing(null);
           refresh();
+          setTab("labs");
         }}
       />
+      )}
 
+      {tab === "labs" && (
       <Section title="Labs" emoji="🏢" badge={labs.length ? `${labs.length}` : null}>
         {loading ? (
           <Loading />
@@ -326,7 +278,10 @@ function LabsTab() {
                   <Td align="right">
                     <ActionRow
                       onView={() => setViewing(l)}
-                      onEdit={() => setEditing(l)}
+                      onEdit={() => {
+                        setEditing(l);
+                        setTab("new-lab");
+                      }}
                       onDelete={() => remove(l.id)}
                     />
                   </Td>
@@ -338,6 +293,7 @@ function LabsTab() {
           </div>
         )}
       </Section>
+      )}
 
       {viewing && <LabViewModal lab={viewing} onClose={() => setViewing(null)} />}
     </>
@@ -556,7 +512,7 @@ function LabForm({
 
 // ---------- COURSES TAB ----------
 
-function CoursesTab() {
+function CoursesTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [incharges, setIncharges] = useState<AdminUser[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -625,24 +581,33 @@ function CoursesTab() {
     <>
       {error && <ErrorBox msg={error} />}
 
+      {tab === "departments" && (
       <DepartmentsPanel
         departments={departments}
         onChanged={refresh}
         onError={setError}
       />
+      )}
 
+      {tab === "new-practical" && (
       <CourseForm
         editing={editing}
         incharges={incharges}
         departments={departments}
         labs={labs}
-        onCancel={() => setEditing(null)}
+        onCancel={() => {
+          setEditing(null);
+          setTab("practicals");
+        }}
         onSaved={() => {
           setEditing(null);
           refresh();
+          setTab("practicals");
         }}
       />
+      )}
 
+      {tab === "practicals" && (
       <Section
         title="Practicals / Courses"
         emoji="📘"
@@ -706,7 +671,10 @@ function CoursesTab() {
                   <Td align="right">
                     <ActionRow
                       onView={() => setViewing(c)}
-                      onEdit={() => setEditing(c)}
+                      onEdit={() => {
+                        setEditing(c);
+                        setTab("new-practical");
+                      }}
                       onDelete={() => remove(c.id)}
                     />
                   </Td>
@@ -718,6 +686,7 @@ function CoursesTab() {
           </div>
         )}
       </Section>
+      )}
 
       {viewing && (
         <CourseViewModal course={viewing} onClose={() => setViewing(null)} />
@@ -1947,7 +1916,7 @@ type StaffRosterEntry = {
   created_at: string;
 };
 
-function AccessTab() {
+function StudentAccessTab() {
   const [error, setError] = useState<string | null>(null);
   useAutoDismiss(error, setError);
 
@@ -1955,6 +1924,17 @@ function AccessTab() {
     <>
       {error && <ErrorBox msg={error} />}
       <RosterPanel onError={setError} />
+    </>
+  );
+}
+
+function StaffAccessTab() {
+  const [error, setError] = useState<string | null>(null);
+  useAutoDismiss(error, setError);
+
+  return (
+    <>
+      {error && <ErrorBox msg={error} />}
       <StaffRosterPanel onError={setError} />
     </>
   );

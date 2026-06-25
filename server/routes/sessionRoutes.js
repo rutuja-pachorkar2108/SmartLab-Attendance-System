@@ -2,6 +2,7 @@ const express = require('express');
 const {
     scheduleSession,
     deleteSession,
+    deleteSessionSeries,
     listActiveSessions,
     listUpcomingSessions,
 } = require('../controllers/sessionController');
@@ -18,6 +19,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.post('/',           requireRole('incharge'), scheduleSession);
+router.delete('/series/:seriesId', requireRole('incharge'), deleteSessionSeries);
 router.delete('/:id',      requireRole('incharge'), deleteSession);
 
 router.get('/active',      requireRole('student'), listActiveSessions);

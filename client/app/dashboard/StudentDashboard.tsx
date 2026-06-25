@@ -5,6 +5,15 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
 import { useViewAll } from "@/lib/useViewAll";
+import { DashTabs, type TabDef } from "./Tabs";
+
+type StudentTab = "practicals" | "presence" | "attendance";
+
+const STUDENT_TABS: TabDef<StudentTab>[] = [
+  { id: "practicals", emoji: "⚡", label: "Practical Sessions" },
+  { id: "presence", emoji: "🏢", label: "Lab Check-In" },
+  { id: "attendance", emoji: "📊", label: "My Attendance" },
+];
 
 type ActiveSession = {
   id: number;
@@ -71,6 +80,7 @@ const primaryBtnCls =
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const [tab, setTab] = useState<StudentTab>("practicals");
   const [active, setActive] = useState<ActiveSession[]>([]);
   const [upcoming, setUpcoming] = useState<UpcomingSession[]>([]);
   const [summary, setSummary] = useState<CourseSummary[]>([]);
@@ -132,13 +142,11 @@ export default function StudentDashboard() {
   // Labs belonging to the chosen department (matched by department name).
   const labsInDept = labs.filter((l) => l.department === selectedDept);
 
-  // Keep the department selection valid: default to the first admin-defined
-  // department, and reset if the chosen one no longer exists.
+  // Don't pre-select a department — the user must pick one. Only clear the
+  // selection if the chosen department no longer exists.
   useEffect(() => {
     setSelectedDept((prev) =>
-      prev != null && departments.some((d) => d.name === prev)
-        ? prev
-        : departments[0]?.name ?? null
+      prev != null && departments.some((d) => d.name === prev) ? prev : null
     );
   }, [departments]);
 
@@ -265,6 +273,9 @@ export default function StudentDashboard() {
         </div>
       </section>
 
+      <DashTabs tabs={STUDENT_TABS} active={tab} onChange={setTab} />
+
+      {tab === "presence" && (
       <Section
         title="Lab Presence"
         emoji="🏢"
@@ -347,6 +358,7 @@ export default function StudentDashboard() {
                       className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-violet-200"
                       style={{ borderColor: "var(--color-border)" }}
                     >
+                      <option value="">Select department</option>
                       {departments.map((d) => (
                         <option key={d.id} value={d.name}>
                           {d.name}
@@ -373,7 +385,11 @@ export default function StudentDashboard() {
                       disabled={labsInDept.length === 0}
                     >
                       {labsInDept.length === 0 ? (
-                        <option value="">No labs in this department</option>
+                        <option value="">
+                          {selectedDept == null
+                            ? "Select a department first"
+                            : "No labs in this department"}
+                        </option>
                       ) : (
                         labsInDept.map((l) => (
                           <option key={l.id} value={l.id}>
@@ -403,14 +419,18 @@ export default function StudentDashboard() {
                   className={primaryBtnCls}
                   style={{ backgroundColor: "var(--color-success)" }}
                 >
-                  {labBusy === selectedLabId ? "Checking in…" : "Check in"}
+                  {selectedLabId != null && labBusy === selectedLabId
+                    ? "Checking in…"
+                    : "Check in"}
                 </button>
               </div>
             );
           })()
         )}
       </Section>
+      )}
 
+      {tab === "practicals" && (
       <Section
         title="Active Practical Sessions"
         emoji="⚡"
@@ -492,7 +512,9 @@ export default function StudentDashboard() {
           </ul>
         )}
       </Section>
+      )}
 
+      {tab === "practicals" && (
       <Section
         title="Upcoming This Week"
         emoji="📅"
@@ -531,7 +553,9 @@ export default function StudentDashboard() {
           </ul>
         )}
       </Section>
+      )}
 
+      {tab === "attendance" && (
       <Section title="My Attendance" emoji="📊">
         {summary.length === 0 ? (
           <Empty
@@ -547,7 +571,9 @@ export default function StudentDashboard() {
           </div>
         )}
       </Section>
+      )}
 
+      {tab === "presence" && (
       <Section
         title="Recent Lab Visits"
         emoji="🕒"
@@ -596,6 +622,7 @@ export default function StudentDashboard() {
           </>
         )}
       </Section>
+      )}
     </>
   );
 }

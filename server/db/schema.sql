@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     scheduled_start  TIMESTAMPTZ  NOT NULL,
     scheduled_end    TIMESTAMPTZ  NOT NULL,
     notes            TEXT,
+    -- Shared by all weekly occurrences created from one "repeat weekly" schedule,
+    -- so the whole series can be deleted at once. NULL for one-off sessions.
+    series_id        UUID,
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CHECK (scheduled_end > scheduled_start),
     CONSTRAINT sessions_no_overlap
@@ -68,6 +71,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_course_window
     ON sessions(course_id, scheduled_start, scheduled_end);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_series ON sessions(series_id);
 
 CREATE TABLE IF NOT EXISTS attendance (
     id              SERIAL PRIMARY KEY,

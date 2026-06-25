@@ -230,7 +230,7 @@ export default function RegisterPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center px-4 py-10"
+      className="flex min-h-screen items-start justify-center px-4 pt-4 pb-10"
       style={{ backgroundColor: "#c4b0e3" }}
     >
       <div className="w-full max-w-lg">
@@ -242,15 +242,15 @@ export default function RegisterPage() {
             <img
               src="/SNJB_Logo.jpg"
               alt="SNJB College logo"
-              className="h-44 w-44 object-contain mb-4"
+              className="h-44 w-44 object-contain -mb-3"
               onError={() => setLogoFailed(true)}
             />
           )}
           <div className="text-center mb-3">
-            <div className="text-xl font-bold text-violet-950 leading-tight">
+            <div className="text-sm font-bold text-violet-950 leading-tight whitespace-nowrap">
               SNJB&apos;s Late Sau. K.B. Jain College of Engineering
             </div>
-            <div className="text-sm font-semibold text-fuchsia-600 mt-1.5 leading-snug">
+            <div className="text-lg font-semibold text-fuchsia-600 mt-1.5 leading-snug">
               Smart Lab Log: User Authentication and Logbook Automation for
               Computer Labs
             </div>
@@ -263,7 +263,7 @@ export default function RegisterPage() {
         <form
           onSubmit={onSubmit}
           noValidate
-          className="bg-white/80 backdrop-blur rounded-3xl p-8 shadow-[0_20px_60px_-20px_rgba(124,58,237,0.25)] border border-white space-y-5"
+          className="bg-white/80 backdrop-blur rounded-3xl px-8 py-5 shadow-[0_20px_60px_-20px_rgba(124,58,237,0.25)] border border-white space-y-4"
         >
           <div>
             <label className="text-sm font-medium text-violet-900 mb-2 block">
@@ -377,7 +377,7 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onBlur={() => markTouched("name")}
-                  placeholder="Aqil Ahmed"
+                  placeholder="Enter your full name"
                   maxLength={60}
                   className={inputCls("name")}
                   aria-invalid={!!showErr("name")}
@@ -391,7 +391,7 @@ export default function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => markTouched("email")}
-                  placeholder="you@col.edu"
+                  placeholder="name@college.edu"
                   maxLength={254}
                   className={inputCls("email")}
                   aria-invalid={!!showErr("email")}
@@ -475,7 +475,7 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onBlur={() => markTouched("name")}
-                  placeholder="Prof. R. Roy"
+                  placeholder="Enter your full name"
                   maxLength={60}
                   className={inputCls("name")}
                   aria-invalid={!!showErr("name")}
@@ -503,7 +503,7 @@ export default function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => markTouched("email")}
-                  placeholder="you@col.edu"
+                  placeholder="name@college.edu"
                   maxLength={254}
                   className={inputCls("email")}
                   aria-invalid={!!showErr("email")}
@@ -530,7 +530,7 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onBlur={() => markTouched("name")}
-                  placeholder="Aqil Ahmed"
+                  placeholder="Enter your full name"
                   maxLength={60}
                   className={inputCls("name")}
                   aria-invalid={!!showErr("name")}
@@ -545,7 +545,7 @@ export default function RegisterPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onBlur={() => markTouched("email")}
-                    placeholder="you@col.edu"
+                    placeholder="name@college.edu"
                     maxLength={254}
                     className={inputCls("email")}
                     aria-invalid={!!showErr("email")}

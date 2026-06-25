@@ -15,8 +15,9 @@
     "db:migrate-v7": "node db/migrate-v7.js",
     "db:migrate-v8": "node db/migrate-v8.js",
     "db:migrate-v9": "node db/migrate-v9.js",
+    "db:migrate-v10": "node db/migrate-v10.js",
     "db:seed": "node db/seed.js",
-    "db:setup": "npm run db:init && npm run db:migrate-v2 && npm run db:migrate-v3 && npm run db:migrate-v4 && npm run db:migrate-v5 && npm run db:migrate-v6 && npm run db:migrate-v7 && npm run db:migrate-v8 && npm run db:migrate-v9 && npm run db:seed",
+    "db:setup": "npm run db:init && npm run db:migrate-v2 && npm run db:migrate-v3 && npm run db:migrate-v4 && npm run db:migrate-v5 && npm run db:migrate-v6 && npm run db:migrate-v7 && npm run db:migrate-v8 && npm run db:migrate-v9 && npm run db:migrate-v10 && npm run db:seed",
     "db:deploy": "node db/deploy.js"
   },
   "keywords": [],

@@ -11,10 +11,30 @@
 // Why a guard is needed: `npm run db:setup` includes migrate-v2, which DROPs
 // and rebuilds the sessions/attendance tables. That's fine on an empty DB but
 // destructive if re-run on a live one — so we gate the whole thing.
+//
+// On an already-initialized DB we still apply the LIVE-SAFE migrations (v3+)
+// so additive schema changes (new columns/tables) reach production on the next
+// deploy without wiping data or reseeding. These are all idempotent
+// (ADD COLUMN IF NOT EXISTS / CREATE TABLE IF NOT EXISTS / DROP ... IF EXISTS),
+// so re-running them every deploy is a no-op once applied. v2 (destructive
+// rebuild) and the demo seed are intentionally excluded here.
 
 require('dotenv').config();
 const { execSync } = require('child_process');
 const { pool } = require('../config/db');
+
+// npm scripts for migrations that are safe to run against a live database, in
+// order. Append new idempotent migrations here so they auto-apply on deploy.
+const LIVE_SAFE_MIGRATIONS = [
+    'db:migrate-v3',
+    'db:migrate-v4',
+    'db:migrate-v5',
+    'db:migrate-v6',
+    'db:migrate-v7',
+    'db:migrate-v8',
+    'db:migrate-v9',
+    'db:migrate-v10',
+];
 
 async function alreadyInitialized() {
     // to_regclass returns NULL when the table doesn't exist yet.
@@ -32,8 +52,12 @@ async function main() {
 
     if (initialized) {
         console.log(
-            'db:deploy — database already initialized; skipping setup & seed (data preserved).'
+            'db:deploy — database already initialized; applying live-safe migrations (data preserved)…'
         );
+        for (const script of LIVE_SAFE_MIGRATIONS) {
+            execSync(`npm run ${script}`, { stdio: 'inherit' });
+        }
+        console.log('db:deploy — migrations up to date.');
         return;
     }
 

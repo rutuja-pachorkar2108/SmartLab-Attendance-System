@@ -10,6 +10,16 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
 import { useViewAll } from "@/lib/useViewAll";
+import { DashTabs, type TabDef } from "./Tabs";
+
+type InchargeTab = "overview" | "sessions" | "roster" | "students";
+
+const INCHARGE_TABS: TabDef<InchargeTab>[] = [
+  { id: "overview", emoji: "📊", label: "Overview" },
+  { id: "sessions", emoji: "📅", label: "Sessions" },
+  { id: "roster", emoji: "📋", label: "Session Attendance" },
+  { id: "students", emoji: "👥", label: "Students" },
+];
 
 type Course = {
   id: number;
@@ -26,6 +36,7 @@ type Session = {
   scheduled_start: string;
   scheduled_end: string;
   notes: string | null;
+  series_id: string | null;
   is_live: boolean;
   is_past: boolean;
 };
@@ -225,6 +236,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
     "all"
   );
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [tab, setTab] = useState<InchargeTab>("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useAutoDismiss(error, setError);
@@ -267,6 +279,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
   }, [load]);
 
   async function viewRoster(s: Session) {
+    setTab("roster");
     setRosterFor(s);
     setRoster(null);
     try {
@@ -289,6 +302,25 @@ function CourseDetail({ courseId }: { courseId: number }) {
     if (!confirm("Delete this scheduled session? Any marked attendance for it will be removed.")) return;
     try {
       await api(`/api/sessions/${id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Delete failed");
+    }
+  }
+
+  // Delete every weekly occurrence created together with this one.
+  async function deleteSeries(seriesId: string) {
+    const count = sessions.filter((x) => x.series_id === seriesId).length;
+    if (
+      !confirm(
+        `Delete the entire weekly series (${count} session${count === 1 ? "" : "s"})? ` +
+          "Any marked attendance for them will be removed. This cannot be undone."
+      )
+    )
+      return;
+    try {
+      await api(`/api/sessions/series/${seriesId}`, { method: "DELETE" });
+      setError(null);
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Delete failed");
@@ -378,7 +410,10 @@ function CourseDetail({ courseId }: { courseId: number }) {
     <>
       {error && <ErrorBox msg={error} />}
 
+      <DashTabs tabs={INCHARGE_TABS} active={tab} onChange={setTab} />
+
       {/* Overview KPIs */}
+      {tab === "overview" && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard emoji="👥" label="Students" value={totals?.students ?? 0} />
         <StatCard emoji="📚" label="Sessions" value={totals?.sessions ?? 0} />
@@ -397,9 +432,13 @@ function CourseDetail({ courseId }: { courseId: number }) {
           accent={attnColor(avgAttendance)}
         />
       </div>
+      )}
 
-      <ScheduleSessionForm courseId={courseId} onScheduled={load} />
+      {tab === "sessions" && (
+        <ScheduleSessionForm courseId={courseId} onScheduled={load} />
+      )}
 
+      {tab === "overview" && (
       <Section
         title="Live Session"
         emoji={live ? "🟢" : "💤"}
@@ -444,7 +483,9 @@ function CourseDetail({ courseId }: { courseId: number }) {
           />
         )}
       </Section>
+      )}
 
+      {tab === "sessions" && (
       <Section title="Upcoming Sessions" emoji="📅" badge={upcoming.length ? `${upcoming.length}` : null}>
         {upcoming.length === 0 ? (
           <Empty emoji="📭" title="Nothing upcoming" sub="Schedule a session above." />
@@ -456,8 +497,19 @@ function CourseDetail({ courseId }: { courseId: number }) {
                 className="px-5 py-3 flex items-center justify-between gap-4 flex-wrap"
               >
                 <div>
-                  <div className="font-semibold" style={{ color: "var(--color-text)" }}>
+                  <div className="font-semibold flex items-center gap-2" style={{ color: "var(--color-text)" }}>
                     {fmtRange(s.scheduled_start, s.scheduled_end)}
+                    {s.series_id && (
+                      <span
+                        className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                        style={{
+                          backgroundColor: "var(--color-surface-alt)",
+                          color: "var(--color-primary)",
+                        }}
+                      >
+                        Weekly
+                      </span>
+                    )}
                   </div>
                   {s.notes && (
                     <div className="text-xs mt-0.5" style={{ color: "var(--color-muted)" }}>
@@ -465,23 +517,40 @@ function CourseDetail({ courseId }: { courseId: number }) {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => deleteSession(s.id)}
-                  className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,white)]"
-                  style={{
-                    borderColor:
-                      "color-mix(in srgb, var(--color-danger) 40%, var(--color-border))",
-                    color: "var(--color-danger)",
-                  }}
-                >
-                  Cancel
-                </button>
+                <div className="flex items-center gap-2">
+                  {s.series_id && (
+                    <button
+                      onClick={() => deleteSeries(s.series_id!)}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,white)]"
+                      style={{
+                        borderColor:
+                          "color-mix(in srgb, var(--color-danger) 40%, var(--color-border))",
+                        color: "var(--color-danger)",
+                      }}
+                    >
+                      Delete series
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteSession(s.id)}
+                    className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,white)]"
+                    style={{
+                      borderColor:
+                        "color-mix(in srgb, var(--color-danger) 40%, var(--color-border))",
+                      color: "var(--color-danger)",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </Section>
+      )}
 
+      {tab === "sessions" && (
       <Section title="Past Sessions" emoji="🕒" badge={past.length ? `${past.length}` : null}>
         {past.length === 0 ? (
           <Empty
@@ -539,8 +608,10 @@ function CourseDetail({ courseId }: { courseId: number }) {
         )}
         {pastToggle}
       </Section>
+      )}
 
       {/* Student attendance visualization */}
+      {tab === "overview" && (
       <Section
         title="Student Attendance"
         emoji="📊"
@@ -867,8 +938,19 @@ function CourseDetail({ courseId }: { courseId: number }) {
           </div>
         )}
       </Section>
+      )}
 
-      {rosterFor && roster && (
+      {tab === "roster" && !(rosterFor && roster) && (
+        <Section title="Session Attendance" emoji="📋">
+          <Empty
+            emoji="📋"
+            title="No session selected"
+            sub="Go to the Sessions tab and click “View attendance” on a past session to see who was present."
+          />
+        </Section>
+      )}
+
+      {tab === "roster" && rosterFor && roster && (
         <div ref={rosterRef} style={{ scrollMarginTop: 16 }}>
         <Section
           title={`Session Attendance — ${fmtRange(rosterFor.scheduled_start, rosterFor.scheduled_end)}`}
@@ -937,6 +1019,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
           auto-enroll can't cover (department-name mismatch, cross-department). */}
       {/* <EnrollForm courseId={courseId} onEnrolled={load} /> */}
 
+      {tab === "students" && (
       <Section
         title="Enrolled Students"
         emoji="👥"
@@ -1091,6 +1174,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
           </>
         )}
       </Section>
+      )}
     </>
   );
 }
@@ -1193,26 +1277,61 @@ function ScheduleSessionForm({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [weeks, setWeeks] = useState(12);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   useAutoDismiss(error, setError);
+  useAutoDismiss(success, setSuccess);
   const [busy, setBusy] = useState(false);
+
+  // Weekday the chosen date falls on, so the incharge sees exactly which day
+  // the weekly practical will repeat on (e.g. "every Monday").
+  const weekday = date
+    ? new Date(`${date}T00:00`).toLocaleDateString(undefined, { weekday: "long" })
+    : null;
+
+  // Day-of-week (0=Sun..6=Sat) currently selected via the date, or "" if unset.
+  const selectedDow = date ? new Date(`${date}T00:00`).getDay() : "";
+
+  // Picking a day snaps the date to the next matching weekday (counting from the
+  // already-chosen date, or today if none), keeping date and day in sync.
+  function onDayChange(dowStr: string) {
+    if (dowStr === "") return;
+    const target = parseInt(dowStr, 10);
+    const base = date ? new Date(`${date}T00:00`) : new Date();
+    const diff = (target - base.getDay() + 7) % 7;
+    base.setDate(base.getDate() + diff);
+    const y = base.getFullYear();
+    const m = String(base.getMonth() + 1).padStart(2, "0");
+    const d = String(base.getDate()).padStart(2, "0");
+    setDate(`${y}-${m}-${d}`);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setBusy(true);
     try {
       const startISO = new Date(`${date}T${startTime}`).toISOString();
       const endISO = new Date(`${date}T${endTime}`).toISOString();
-      await api("/api/sessions", {
+      const res = await api<{ created: number; skipped: number }>("/api/sessions", {
         method: "POST",
         body: JSON.stringify({
           courseId,
           scheduledStart: startISO,
           scheduledEnd: endISO,
           notes: notes || undefined,
+          repeatWeeks: repeatWeekly ? weeks : undefined,
         }),
       });
+      if (repeatWeekly) {
+        setSuccess(
+          `Scheduled ${res.created} weekly session${res.created === 1 ? "" : "s"}` +
+            (res.skipped ? ` · ${res.skipped} skipped (overlapped existing)` : "")
+        );
+      }
       setDate("");
       setStartTime("");
       setEndTime("");
@@ -1228,7 +1347,7 @@ function ScheduleSessionForm({
   return (
     <Section title="Schedule a Session" emoji="📅">
       <form onSubmit={submit} className="p-5 space-y-3">
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 gap-3">
           <label className="block space-y-1">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
               Date
@@ -1241,6 +1360,26 @@ function ScheduleSessionForm({
               className={inputCls}
               style={inputStyle}
             />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
+              Day
+            </span>
+            <select
+              value={selectedDow}
+              onChange={(e) => onDayChange(e.target.value)}
+              className={inputCls}
+              style={inputStyle}
+            >
+              <option value="">Select day</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+              <option value="0">Sunday</option>
+            </select>
           </label>
           <label className="block space-y-1">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
@@ -1281,10 +1420,64 @@ function ScheduleSessionForm({
             style={inputStyle}
           />
         </label>
+
+        <div
+          className="rounded-lg border p-3 space-y-2"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-alt)" }}
+        >
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={repeatWeekly}
+              onChange={(e) => setRepeatWeekly(e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-primary)]"
+            />
+            <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+              Repeat weekly
+              {weekday && repeatWeekly ? (
+                <span style={{ color: "var(--color-muted)" }}> · every {weekday}</span>
+              ) : null}
+            </span>
+          </label>
+          {repeatWeekly && (
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--color-text)" }}>
+              <span>for</span>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={weeks}
+                onChange={(e) =>
+                  setWeeks(Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 1)))
+                }
+                className="w-20 rounded-md border px-2 py-1 text-sm"
+                style={inputStyle}
+              />
+              <span>weeks (one practical each week)</span>
+            </label>
+          )}
+        </div>
+
         {error && <ErrorBox msg={error} />}
+        {success && (
+          <div
+            className="rounded-md border px-3 py-2 text-sm"
+            style={{
+              backgroundColor: "#e7f6ed",
+              borderColor: "#bfe5cc",
+              color: "var(--color-success)",
+            }}
+          >
+            {success}
+          </div>
+        )}
         <div className="flex justify-end">
           <button disabled={busy} className={primaryBtnCls} style={primaryBtnStyle}>
-            {busy ? "Scheduling…" : "Schedule"}
+            {busy
+              ? "Scheduling…"
+              : repeatWeekly
+              ? `Schedule ${weeks} weeks`
+              : "Schedule"}
           </button>
         </div>
       </form>
