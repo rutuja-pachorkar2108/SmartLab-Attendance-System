@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
-import { useViewAll } from "@/lib/useViewAll";
+import { usePagination } from "@/lib/usePagination";
 import { DashTabs, type TabDef } from "./Tabs";
 
 type StudentTab = "practicals" | "presence" | "attendance";
@@ -238,7 +238,14 @@ export default function StudentDashboard() {
   const firstName = user?.name.split(" ")[0] ?? "there";
 
   // Cap the visit history; it grows with every check-in.
-  const { visible: visibleHistory, toggle: historyToggle } = useViewAll(history);
+  const {
+    visible: visibleHistory,
+    filterBox: historyFilter,
+    controls: historyControls,
+  } = usePagination(history, {
+    searchText: (h) => `${h.lab_name} ${h.room_no}`,
+    searchPlaceholder: "Filter by lab…",
+  });
 
   return (
     <>
@@ -583,6 +590,7 @@ export default function StudentDashboard() {
           <Empty emoji="📭" title="No lab visits yet" sub="Your check-ins will appear here." />
         ) : (
           <>
+          {history.length > 0 && <div className="px-5 pt-4">{historyFilter}</div>}
           <table className="w-full text-sm">
             <thead>
               <tr style={{ backgroundColor: "var(--color-surface-alt)" }}>
@@ -618,7 +626,7 @@ export default function StudentDashboard() {
               ))}
             </tbody>
           </table>
-          {historyToggle}
+          {historyControls}
           </>
         )}
       </Section>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
-import { useViewAll } from "@/lib/useViewAll";
+import { usePagination } from "@/lib/usePagination";
 import { DashTabs, type TabDef } from "./Tabs";
 
 type TaTab = "in" | "history";
@@ -13,6 +13,10 @@ const TA_TABS: TabDef<TaTab>[] = [
   { id: "in", emoji: "🟢", label: "Currently in Lab" },
   { id: "history", emoji: "🕓", label: "Visit History" },
 ];
+
+// The institute's fixed class years and divisions, matching the rest of the app.
+const CLASS_OPTIONS = ["FE", "SE", "TE", "BE"] as const;
+const DIV_OPTIONS = ["A", "B"] as const;
 
 type Lab = {
   id: number;
@@ -90,6 +94,8 @@ function LabPresencePanel() {
   const [active, setActive] = useState<ActivePresence[]>([]);
   const [history, setHistory] = useState<PresenceHistory[]>([]);
   const [date, setDate] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [divFilter, setDivFilter] = useState("");
   const [tab, setTab] = useState<TaTab>("in");
   const [loadingLabs, setLoadingLabs] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
@@ -147,7 +153,23 @@ function LabPresencePanel() {
   const isMyLab = selectedLab?.ta_id === user?.id;
 
   // The visit history grows with every check-in — cap it behind a "View all".
-  const { visible: visibleHistory, toggle: historyToggle } = useViewAll(history);
+  // Class / division dropdown filters for the visit history, using the
+  // institute's fixed class years and divisions (CLASS_OPTIONS / DIV_OPTIONS).
+  const filteredHistory = history.filter(
+    (h) =>
+      (!classFilter || (h.class_name ?? "").toUpperCase() === classFilter) &&
+      (!divFilter || (h.div ?? "").toUpperCase() === divFilter)
+  );
+
+  const {
+    visible: visibleHistory,
+    filterBox: historyFilter,
+    controls: historyControls,
+  } = usePagination(filteredHistory, {
+    searchText: (h) =>
+      `${h.roll_no ?? ""} ${h.student_name} ${h.class_name ?? ""} ${h.div ?? ""}`,
+    searchPlaceholder: "Filter by name or roll no…",
+  });
 
   return (
     <Section
@@ -290,6 +312,45 @@ function LabPresencePanel() {
                 }
               />
             ) : (
+              <>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <div className="flex-1 min-w-[12rem]">{historyFilter}</div>
+                  <select
+                    value={classFilter}
+                    onChange={(e) => setClassFilter(e.target.value)}
+                    aria-label="Filter by class"
+                    className="rounded-md border bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--color-primary)]"
+                    style={{ borderColor: "var(--color-border)" }}
+                  >
+                    <option value="">All classes</option>
+                    {CLASS_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={divFilter}
+                    onChange={(e) => setDivFilter(e.target.value)}
+                    aria-label="Filter by division"
+                    className="rounded-md border bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--color-primary)]"
+                    style={{ borderColor: "var(--color-border)" }}
+                  >
+                    <option value="">All divisions</option>
+                    {DIV_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              {filteredHistory.length === 0 ? (
+                <Empty
+                  emoji="🔍"
+                  title="No visits match"
+                  sub="Try a different class, division, or search term."
+                />
+              ) : (
               <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--color-border)" }}>
                 <table className="w-full text-sm">
                   <thead>
@@ -339,8 +400,10 @@ function LabPresencePanel() {
                     ))}
                   </tbody>
                 </table>
-                {historyToggle}
+                {historyControls}
               </div>
+              )}
+              </>
             )}
           </div>
           )}

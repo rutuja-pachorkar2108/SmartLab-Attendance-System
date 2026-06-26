@@ -9,7 +9,7 @@ import {
 } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
-import { useViewAll } from "@/lib/useViewAll";
+import { usePagination } from "@/lib/usePagination";
 import { DashTabs, type TabDef } from "./Tabs";
 
 type InchargeTab = "overview" | "sessions" | "roster" | "students";
@@ -391,12 +391,24 @@ function CourseDetail({ courseId }: { courseId: number }) {
   );
 
   // Cap the lists that grow over a course's life behind "View all" toggles.
-  const { visible: visiblePast, toggle: pastToggle } = useViewAll(past);
-  const { visible: visibleRoster, toggle: rosterToggle } = useViewAll(
-    roster ?? []
-  );
-  const { visible: visibleStudentRows, toggle: studentsToggle } =
-    useViewAll(visibleStudents);
+  const { visible: visiblePast, controls: pastControls } = usePagination(past);
+  const {
+    visible: visibleRoster,
+    filterBox: rosterFilter,
+    controls: rosterControls,
+  } = usePagination(roster ?? [], {
+    searchText: (r) => `${r.roll_no ?? ""} ${r.student_name}`,
+    searchPlaceholder: "Filter by roll no or name…",
+  });
+  const {
+    visible: visibleStudentRows,
+    filterBox: studentsFilter,
+    controls: studentsControls,
+  } = usePagination(visibleStudents, {
+    searchText: (s) =>
+      `${s.roll_no ?? ""} ${s.name} ${s.class_name ?? ""} ${s.div ?? ""} ${s.email}`,
+    searchPlaceholder: "Filter students…",
+  });
 
   if (loading) {
     return (
@@ -606,7 +618,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
             })}
           </ul>
         )}
-        {pastToggle}
+        {pastControls}
       </Section>
       )}
 
@@ -956,6 +968,9 @@ function CourseDetail({ courseId }: { courseId: number }) {
           title={`Session Attendance — ${fmtRange(rosterFor.scheduled_start, rosterFor.scheduled_end)}`}
           emoji="📋"
         >
+          {(roster ?? []).length > 0 && (
+            <div className="px-5 pt-4">{rosterFilter}</div>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr style={{ backgroundColor: "var(--color-surface-alt)" }}>
@@ -1009,7 +1024,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
               ))}
             </tbody>
           </table>
-          {rosterToggle}
+          {rosterControls}
         </Section>
         </div>
       )}
@@ -1123,6 +1138,9 @@ function CourseDetail({ courseId }: { courseId: number }) {
                 </a>
               )}
             </div>
+            {students.length > 0 && (
+              <div className="mb-3">{studentsFilter}</div>
+            )}
             {visibleStudents.length === 0 ? (
               <Empty
                 emoji="🔍"
@@ -1168,7 +1186,7 @@ function CourseDetail({ courseId }: { courseId: number }) {
                     ))}
                   </tbody>
                 </table>
-                {studentsToggle}
+                {studentsControls}
               </div>
             )}
           </>

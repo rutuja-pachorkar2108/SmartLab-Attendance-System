@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { parseCsv, rowsToRecords } from "@/lib/csv";
 import { downloadXlsx, parseXlsxFile } from "@/lib/xlsx";
 import { useAutoDismiss } from "@/lib/useTimedErrors";
-import { useViewAll } from "@/lib/useViewAll";
+import { usePagination } from "@/lib/usePagination";
 import { DashTabs, type TabDef } from "./Tabs";
 
 type Role = "student" | "incharge" | "ta" | "admin";
@@ -148,7 +148,14 @@ function LabsTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   useAutoDismiss(error, setError);
   const [editing, setEditing] = useState<Lab | null>(null);
   const [viewing, setViewing] = useState<Lab | null>(null);
-  const { visible: visibleLabs, toggle: labsToggle } = useViewAll(labs);
+  const {
+    visible: visibleLabs,
+    filterBox: labsFilter,
+    controls: labsControls,
+  } = usePagination(labs, {
+    searchText: (l) => `${l.room_no} ${l.name} ${l.department ?? ""} ${l.floor ?? ""}`,
+    searchPlaceholder: "Filter labs…",
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -219,6 +226,7 @@ function LabsTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
 
       {tab === "labs" && (
       <Section title="Labs" emoji="🏢" badge={labs.length ? `${labs.length}` : null}>
+        {labs.length > 0 && <div className="px-5 pt-4">{labsFilter}</div>}
         {loading ? (
           <Loading />
         ) : labs.length === 0 ? (
@@ -289,7 +297,7 @@ function LabsTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
               ))}
             </tbody>
           </table>
-          {labsToggle}
+          {labsControls}
           </div>
         )}
       </Section>
@@ -522,7 +530,15 @@ function CoursesTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   useAutoDismiss(error, setError);
   const [editing, setEditing] = useState<Course | null>(null);
   const [viewing, setViewing] = useState<Course | null>(null);
-  const { visible: visibleCourses, toggle: coursesToggle } = useViewAll(courses);
+  const {
+    visible: visibleCourses,
+    filterBox: coursesFilter,
+    controls: coursesControls,
+  } = usePagination(courses, {
+    searchText: (c) =>
+      `${c.code} ${c.name} ${c.department_name ?? ""} ${c.lab_name ?? ""} ${c.incharge_name ?? ""}`,
+    searchPlaceholder: "Filter practicals…",
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -613,6 +629,7 @@ function CoursesTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
         emoji="📘"
         badge={courses.length ? `${courses.length}` : null}
       >
+        {courses.length > 0 && <div className="px-5 pt-4">{coursesFilter}</div>}
         {loading ? (
           <Loading />
         ) : courses.length === 0 ? (
@@ -682,7 +699,7 @@ function CoursesTab({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
               ))}
             </tbody>
           </table>
-          {coursesToggle}
+          {coursesControls}
           </div>
         )}
       </Section>
@@ -1178,7 +1195,7 @@ function UsersTab() {
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [viewingUser, setViewingUser] = useState<AdminUser | null>(null);
-  const { visible: visibleUsers, toggle: usersToggle } = useViewAll(users);
+  const { visible: visibleUsers, controls: usersControls } = usePagination(users);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1295,7 +1312,7 @@ function UsersTab() {
               ))}
             </tbody>
           </table>
-          {usersToggle}
+          {usersControls}
           </div>
         )}
       </Section>
@@ -2145,7 +2162,15 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<RosterEntry | null>(null);
   const [editing, setEditing] = useState<RosterEntry | null>(null);
-  const { visible: visibleEntries, toggle: entriesToggle } = useViewAll(entries);
+  const {
+    visible: visibleEntries,
+    filterBox: entriesFilter,
+    controls: entriesControls,
+  } = usePagination(entries, {
+    searchText: (e) =>
+      `${e.prn_no} ${e.name ?? ""} ${e.department ?? ""} ${e.class_name ?? ""} ${e.div ?? ""}`,
+    searchPlaceholder: "Filter students…",
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -2316,6 +2341,8 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
           </div>
         </form>
 
+        {entries.length > 0 && entriesFilter}
+
         {loading ? (
           <Loading />
         ) : entries.length === 0 ? (
@@ -2391,7 +2418,7 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
               ))}
             </tbody>
           </table>
-          {entriesToggle}
+          {entriesControls}
           </div>
         )}
       </div>
@@ -2434,7 +2461,15 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<StaffRosterEntry | null>(null);
   const [editing, setEditing] = useState<StaffRosterEntry | null>(null);
-  const { visible: visibleEntries, toggle: entriesToggle } = useViewAll(entries);
+  const {
+    visible: visibleEntries,
+    filterBox: entriesFilter,
+    controls: entriesControls,
+  } = usePagination(entries, {
+    searchText: (e) =>
+      `${e.employee_id} ${e.role} ${e.name ?? ""} ${e.department ?? ""}`,
+    searchPlaceholder: "Filter staff…",
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -2587,6 +2622,8 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
           </div>
         </form>
 
+        {entries.length > 0 && entriesFilter}
+
         {loading ? (
           <Loading />
         ) : entries.length === 0 ? (
@@ -2660,7 +2697,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
               ))}
             </tbody>
           </table>
-          {entriesToggle}
+          {entriesControls}
           </div>
         )}
       </div>
