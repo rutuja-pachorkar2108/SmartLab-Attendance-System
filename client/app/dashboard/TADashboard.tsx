@@ -102,16 +102,17 @@ function LabPresencePanel() {
   const [error, setError] = useState<string | null>(null);
   useAutoDismiss(error, setError);
 
-  // Load labs once; default the selection to the lab this TA is assigned to.
+  // Load labs once and keep only the lab assigned to this TA — a TA can see
+  // presence data for their own lab only, never other labs.
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const d = await api<{ labs: Lab[] }>("/api/labs");
         if (!alive) return;
-        setLabs(d.labs);
-        const mine = d.labs.find((l) => l.ta_id === user?.id);
-        setLabId(mine?.id ?? d.labs[0]?.id ?? null);
+        const mine = d.labs.filter((l) => l.ta_id === user?.id);
+        setLabs(mine);
+        setLabId(mine[0]?.id ?? null);
       } catch (err) {
         if (alive)
           setError(err instanceof ApiError ? err.message : "Failed to load labs");
@@ -183,8 +184,8 @@ function LabPresencePanel() {
       ) : labs.length === 0 ? (
         <Empty
           emoji="🏫"
-          title="No labs yet"
-          sub="Labs are created by the Administrator. Once a lab exists, student visits will show here."
+          title="No lab assigned to you"
+          sub="You aren't assigned to a lab yet. Ask the Administrator to assign you to a lab — your lab's student visits will then show here."
         />
       ) : (
         <div className="p-5 space-y-5">
@@ -196,19 +197,14 @@ function LabPresencePanel() {
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
                 Lab
               </span>
-              <select
-                value={labId ?? ""}
-                onChange={(e) => setLabId(e.target.value ? Number(e.target.value) : null)}
-                className="rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-violet-200"
-                style={{ borderColor: "var(--color-border)" }}
+              <div
+                className="rounded-lg border bg-[var(--color-surface-alt)] px-3 py-2 text-sm font-semibold"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
               >
-                {labs.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name} · Room {l.room_no}
-                    {l.ta_id === user?.id ? " (your lab)" : ""}
-                  </option>
-                ))}
-              </select>
+                {selectedLab
+                  ? `${selectedLab.name} · Room ${selectedLab.room_no}`
+                  : "—"}
+              </div>
             </label>
             <label className="block space-y-1">
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>

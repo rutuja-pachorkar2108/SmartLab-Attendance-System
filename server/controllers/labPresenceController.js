@@ -67,9 +67,27 @@ async function myHistory(req, res) {
     return res.json({ history: result.rows });
 }
 
+// A TA may only view presence for the lab assigned to them. Returns true if the
+// request is allowed; otherwise sets a 403/404 response and returns false.
+async function taMayAccessLab(req, res, labId) {
+    if (req.user.role !== 'ta') return true;
+    const lab = await query('SELECT ta_id FROM labs WHERE id = $1', [labId]);
+    if (lab.rowCount === 0) {
+        res.status(404).json({ error: 'Lab not found' });
+        return false;
+    }
+    if (lab.rows[0].ta_id !== req.user.id) {
+        res.status(403).json({ error: 'You can only view the lab assigned to you.' });
+        return false;
+    }
+    return true;
+}
+
 async function listLabActivePresence(req, res) {
     const labId = parseInt(req.params.id, 10);
     if (Number.isNaN(labId)) return res.status(400).json({ error: 'Invalid lab id' });
+
+    if (!(await taMayAccessLab(req, res, labId))) return;
 
     const result = await query(
         `SELECT p.id, p.checked_in_at,
@@ -92,6 +110,8 @@ async function listLabPresenceHistory(req, res) {
 
     const lab = await query('SELECT id FROM labs WHERE id = $1', [labId]);
     if (lab.rowCount === 0) return res.status(404).json({ error: 'Lab not found' });
+
+    if (!(await taMayAccessLab(req, res, labId))) return;
 
     const params = [labId];
     let dateFilter = '';

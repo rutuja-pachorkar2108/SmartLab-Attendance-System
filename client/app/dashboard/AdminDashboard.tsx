@@ -882,6 +882,7 @@ function CourseForm({
   const [error, setError] = useState<string | null>(null);
   useAutoDismiss(error, setError);
   const [notice, setNotice] = useState<string | null>(null);
+  useAutoDismiss(notice, setNotice);
   const formRef = useRef<HTMLDivElement | null>(null);
 
   const addingNew = courseSel === ADD_NEW_COURSE;
@@ -2272,9 +2273,10 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
               className={inputCls}
               style={inputStyle}
               value={prn}
-              onChange={(e) => setPrn(e.target.value.replace(/\D/g, "").slice(0, 15))}
-              placeholder="74200xxxxxx"
-              inputMode="numeric"
+              onChange={(e) =>
+                setPrn(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 20))
+              }
+              placeholder="74200XXXXXX"
             />
           </Field>
           <Field label="Name *">

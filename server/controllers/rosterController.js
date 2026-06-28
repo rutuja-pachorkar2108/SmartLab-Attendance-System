@@ -1,6 +1,6 @@
 const { query } = require('../config/db');
 
-const PRN_RE = /^\d{10,15}$/;
+const PRN_RE = /^[A-Z0-9]{5,20}$/;
 
 async function listRoster(req, res) {
     const { status, q } = req.query;
@@ -28,11 +28,11 @@ async function listRoster(req, res) {
 
 async function addRosterEntry(req, res) {
     const { prnNo, name, department, className, div } = req.body || {};
-    const trimmedPrn = typeof prnNo === 'string' ? prnNo.trim() : '';
+    const trimmedPrn = typeof prnNo === 'string' ? prnNo.trim().toUpperCase() : '';
     const trimmedName = typeof name === 'string' ? name.trim() : '';
     if (!trimmedPrn) return res.status(400).json({ error: 'prnNo is required' });
     if (!PRN_RE.test(trimmedPrn)) {
-        return res.status(400).json({ error: 'prnNo must be 10–15 digits' });
+        return res.status(400).json({ error: 'prnNo must be 5–20 letters or digits' });
     }
     if (!trimmedName) return res.status(400).json({ error: 'name is required' });
 
@@ -77,7 +77,7 @@ async function bulkAddRosterEntries(req, res) {
     for (let i = 0; i < entries.length; i++) {
         const { prnNo, name, department, className, div } = entries[i] || {};
         const row = i + 1;
-        const trimmedPrn = typeof prnNo === 'string' ? prnNo.trim() : '';
+        const trimmedPrn = typeof prnNo === 'string' ? prnNo.trim().toUpperCase() : '';
 
         if (!trimmedPrn) {
             failed++;
@@ -85,14 +85,14 @@ async function bulkAddRosterEntries(req, res) {
             continue;
         }
         if (!PRN_RE.test(trimmedPrn)) {
-            const looksScientific = /[eE.]/.test(trimmedPrn);
+            const looksScientific = /\d\.\d|[eE][+-]?\d/.test(trimmedPrn);
             failed++;
             problems.push({
                 row,
                 value: trimmedPrn,
                 reason: looksScientific
                     ? 'PRN got converted to scientific notation by Excel — format that column as Text (or edit the CSV in a plain-text editor / Google Sheets) and re-upload'
-                    : 'PRN must be 10–15 digits',
+                    : 'PRN must be 5–20 letters or digits',
             });
             continue;
         }

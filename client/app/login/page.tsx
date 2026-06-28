@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAutoDismiss, useTimedFieldErrors } from "@/lib/useTimedErrors";
+import {
+  ERROR_VISIBLE_MS,
+  useAutoDismiss,
+  useTimedFieldErrors,
+} from "@/lib/useTimedErrors";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -50,6 +54,13 @@ export default function LoginPage() {
 
   // Auto-dismiss the submit/server error banner after a few seconds.
   useAutoDismiss(error, setError);
+
+  // Auto-dismiss the "account created" confirmation after a few seconds too.
+  useEffect(() => {
+    if (!justRegistered) return;
+    const id = setTimeout(() => setJustRegistered(false), ERROR_VISIBLE_MS);
+    return () => clearTimeout(id);
+  }, [justRegistered]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

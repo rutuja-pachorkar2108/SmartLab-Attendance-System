@@ -33,7 +33,7 @@ const ROLES: { value: Role; label: string; emoji: string; tint: string }[] = [
 
 const NAME_RE = /^[A-Za-z][A-Za-z .'-]{1,59}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PRN_RE = /^\d{10,15}$/;
+const PRN_RE = /^[A-Z0-9]{5,20}$/;
 const ROLL_RE = /^[A-Za-z0-9-]{1,20}$/;
 const EMP_RE = /^[A-Za-z0-9-]{2,20}$/;
 const DIV_RE = /^[A-Za-z]$/;
@@ -151,7 +151,7 @@ export default function RegisterPage() {
       if (!className) e.className = "Select a class";
       if (!prnNo.trim()) e.prnNo = "PRN is required";
       else if (!PRN_RE.test(prnNo.trim()))
-        e.prnNo = "PRN must be 10–15 digits";
+        e.prnNo = "PRN must be 5–20 letters or digits";
       if (div && !DIV_RE.test(div.trim()))
         e.div = "Division must be a single letter (A–Z)";
       if (rollNo && !ROLL_RE.test(rollNo.trim()))
@@ -361,11 +361,12 @@ export default function RegisterPage() {
 
               <FieldShell label="PRN no." error={showErr("prnNo")}>
                 <input
-                  inputMode="numeric"
                   value={prnNo}
-                  onChange={(e) => setPrnNo(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                  onChange={(e) =>
+                    setPrnNo(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 20))
+                  }
                   onBlur={() => markTouched("prnNo")}
-                  placeholder="74200xxxxxx"
+                  placeholder="74200XXXXXX"
                   className={inputCls("prnNo")}
                   aria-invalid={!!showErr("prnNo")}
                 />

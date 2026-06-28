@@ -56,6 +56,9 @@ async function register(req, res) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    // PRNs are alphanumeric; store/compare them uppercased so registration matches
+    // the roster regardless of the case the student typed.
+    const normalizedPrn = prnNo ? String(prnNo).trim().toUpperCase() : null;
     const existing = await query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
     if (existing.rowCount > 0) {
         return res.status(409).json({ error: 'Email already registered' });
@@ -73,7 +76,7 @@ async function register(req, res) {
             const lock = await client.query(
                 `SELECT id, name, claimed_user_id FROM student_roster
                  WHERE prn_no = $1 FOR UPDATE`,
-                [String(prnNo).trim()]
+                [normalizedPrn]
             );
             if (lock.rowCount === 0) {
                 await client.query('ROLLBACK');
@@ -146,7 +149,7 @@ async function register(req, res) {
                 [
                     name, normalizedEmail, passwordHash, role,
                     rollNo || null, employeeId || null,
-                    department || null, className || null, div || null, prnNo || null,
+                    department || null, className || null, div || null, normalizedPrn,
                     normalizedCourses,
                 ]
             );
