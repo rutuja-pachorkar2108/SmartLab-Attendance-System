@@ -8,7 +8,7 @@ const USERS = [
     { name: 'Admin User',  email: 'admin@col.edu',   role: 'admin',    employee_id: 'A001' },
     { name: 'Prof. Roy',   email: 'roy@col.edu',     role: 'incharge', employee_id: 'E101' },
     { name: 'Asst. Khan',  email: 'khan@col.edu',    role: 'ta',       employee_id: 'E202' },
-    { name: 'Aqil Ahmed',  email: 's1@col.edu',      role: 'student',  roll_no: '22BCE001' },
+    { name: 'Riya Sharma', email: 's1@col.edu',      role: 'student',  roll_no: '22BCE001' },
     { name: 'Bina Patel',  email: 's2@col.edu',      role: 'student',  roll_no: '22BCE002' },
     { name: 'Chetan Rao',  email: 's3@col.edu',      role: 'student',  roll_no: '22BCE003' },
     { name: 'Diya Singh',  email: 's4@col.edu',      role: 'student',  roll_no: '22BCE004' },

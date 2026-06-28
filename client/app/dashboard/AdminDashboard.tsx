@@ -1559,7 +1559,7 @@ function EditUserModal({
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Prof. Anita Roy"
+              placeholder="Full name"
               className={inputCls}
               style={inputStyle}
             />
@@ -1570,7 +1570,7 @@ function EditUserModal({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. anita.roy@col.edu"
+              placeholder="e.g. name@col.edu"
               className={inputCls}
               style={inputStyle}
             />
@@ -2244,7 +2244,7 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
           templateName="student-enrollment-template.xlsx"
           exportName="student-enrollment.xlsx"
           headers={["PRN", "Name", "Department", "Class", "Div"]}
-          exampleRows={[["740000000001", "Aqil Ahmed", "Computer Engineering", "TE", "A"]]}
+          exampleRows={[["740000000001", "Full name", "Computer Engineering", "TE", "A"]]}
           buildExportRows={() =>
             entries.map((e) => [
               e.prn_no,
@@ -2286,7 +2286,7 @@ function RosterPanel({ onError }: { onError: (m: string | null) => void }) {
               style={inputStyle}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Aqil Ahmed"
+              placeholder="Full name"
               maxLength={60}
             />
           </Field>
@@ -2543,8 +2543,8 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
           exportName="staff-enrollment.xlsx"
           headers={["Employee ID", "Role", "Name", "Department"]}
           exampleRows={[
-            ["E101", "incharge", "Prof. R. Roy", "Computer Engineering"],
-            ["T201", "ta", "Asst. Khan", "Computer Engineering"],
+            ["E101", "incharge", "Full name", "Computer Engineering"],
+            ["T201", "ta", "Full name", "Computer Engineering"],
           ]}
           buildExportRows={() =>
             entries.map((e) => [
@@ -2593,7 +2593,7 @@ function StaffRosterPanel({ onError }: { onError: (m: string | null) => void }) 
               style={inputStyle}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Prof. R. Roy"
+              placeholder="Full name"
               maxLength={60}
             />
           </Field>
@@ -2862,7 +2862,7 @@ function StudentRosterEditModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
-            placeholder="Aqil Ahmed"
+            placeholder="Full name"
           />
         </Field>
         <Field label="Department">
@@ -3030,7 +3030,7 @@ function StaffRosterEditModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
-            placeholder="Prof. R. Roy"
+            placeholder="Full name"
           />
         </Field>
         <Field label="Department">
