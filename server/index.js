@@ -12,6 +12,7 @@ const sessionRoutes = require('./routes/sessionRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const labRoutes = require('./routes/labRoutes');
 const labPresenceRoutes = require('./routes/labPresenceRoutes');
+const { closeEndedPracticalPresences } = require('./controllers/labPresenceController');
 
 const app = express();
 
@@ -52,6 +53,17 @@ const port = parseInt(process.env.PORT || '4000', 10);
 app.listen(port, () => {
     console.log(`Server listening on http://localhost:${port}`);
 });
+
+// Safety net for forgotten check-outs: periodically close practical visits left
+// open past their session's scheduled end (capped at that end), so recorded
+// presence never exceeds the practical window even if a student never checks out.
+const PRESENCE_SWEEP_MS = 60 * 1000;
+const sweep = () =>
+    closeEndedPracticalPresences().catch((err) =>
+        console.error('presence auto-close sweep failed:', err)
+    );
+sweep();
+setInterval(sweep, PRESENCE_SWEEP_MS).unref?.();
 
 // - Server: npm run dev in server/
 //     - Client: npm run dev in client/

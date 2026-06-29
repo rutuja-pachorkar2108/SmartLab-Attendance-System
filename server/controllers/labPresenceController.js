@@ -1,5 +1,22 @@
 const { query } = require('../config/db');
 
+// Close practical visits left open past their session's end. A forgotten
+// check-out is capped at the session's scheduled end, so it never credits time
+// beyond the practical window. Idempotent — called on a timer (see index.js)
+// and lazily before presence reads, so displayed durations are always current.
+async function closeEndedPracticalPresences() {
+    await query(
+        `UPDATE lab_presence p
+            SET checked_out_at = s.scheduled_end
+           FROM sessions s
+          WHERE p.session_id = s.id
+            AND p.source = 'practical'
+            AND p.checked_out_at IS NULL
+            AND s.scheduled_end <= NOW()
+            AND s.scheduled_end > p.checked_in_at`
+    );
+}
+
 async function checkInToLab(req, res) {
     const labId = parseInt(req.params.id, 10);
     if (Number.isNaN(labId)) return res.status(400).json({ error: 'Invalid lab id' });
@@ -27,11 +44,22 @@ async function checkOut(req, res) {
     const presenceId = parseInt(req.params.id, 10);
     if (Number.isNaN(presenceId)) return res.status(400).json({ error: 'Invalid id' });
 
+    // Manual visits check out at NOW(). A practical visit caps at its session's
+    // scheduled end, so a late check-out never credits time past the practical.
     const result = await query(
-        `UPDATE lab_presence
-            SET checked_out_at = NOW()
-          WHERE id = $1 AND student_id = $2 AND checked_out_at IS NULL
-          RETURNING id, lab_id, student_id, checked_in_at, checked_out_at`,
+        `UPDATE lab_presence p
+            SET checked_out_at = CASE
+                WHEN p.source = 'practical' THEN LEAST(
+                    NOW(),
+                    COALESCE(
+                        (SELECT s.scheduled_end FROM sessions s WHERE s.id = p.session_id),
+                        NOW()
+                    )
+                )
+                ELSE NOW()
+            END
+          WHERE p.id = $1 AND p.student_id = $2 AND p.checked_out_at IS NULL
+          RETURNING p.id, p.lab_id, p.student_id, p.checked_in_at, p.checked_out_at`,
         [presenceId, req.user.id]
     );
     if (result.rowCount === 0) {
@@ -41,8 +69,9 @@ async function checkOut(req, res) {
 }
 
 async function myCurrent(req, res) {
+    await closeEndedPracticalPresences().catch(() => {});
     const result = await query(
-        `SELECT p.id, p.lab_id, p.checked_in_at, p.ip_address,
+        `SELECT p.id, p.lab_id, p.checked_in_at, p.ip_address, p.source, p.session_id,
                 l.name AS lab_name, l.room_no
          FROM lab_presence p
          JOIN labs l ON l.id = p.lab_id
@@ -53,6 +82,7 @@ async function myCurrent(req, res) {
 }
 
 async function myHistory(req, res) {
+    await closeEndedPracticalPresences().catch(() => {});
     const result = await query(
         `SELECT p.id, p.lab_id, p.checked_in_at, p.checked_out_at,
                 l.name AS lab_name, l.room_no,
@@ -89,6 +119,8 @@ async function listLabActivePresence(req, res) {
 
     if (!(await taMayAccessLab(req, res, labId))) return;
 
+    await closeEndedPracticalPresences().catch(() => {});
+
     const result = await query(
         `SELECT p.id, p.checked_in_at,
                 u.id AS student_id, u.name AS student_name, u.roll_no
@@ -112,6 +144,8 @@ async function listLabPresenceHistory(req, res) {
     if (lab.rowCount === 0) return res.status(404).json({ error: 'Lab not found' });
 
     if (!(await taMayAccessLab(req, res, labId))) return;
+
+    await closeEndedPracticalPresences().catch(() => {});
 
     const params = [labId];
     let dateFilter = '';
@@ -151,4 +185,5 @@ module.exports = {
     myHistory,
     listLabActivePresence,
     listLabPresenceHistory,
+    closeEndedPracticalPresences,
 };

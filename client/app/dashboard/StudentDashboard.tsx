@@ -55,6 +55,8 @@ type CurrentPresence = {
   checked_in_at: string;
   lab_name: string;
   room_no: string;
+  source: string;
+  session_id: number | null;
 };
 
 type PresenceRecord = {
@@ -178,11 +180,37 @@ export default function StudentDashboard() {
     setMarking(sessionId);
     try {
       await api(`/api/sessions/${sessionId}/attendance`, { method: "POST" });
-      setFeedback({ id: sessionId, kind: "ok", msg: "✓ You're marked present" });
+      setFeedback({
+        id: sessionId,
+        kind: "ok",
+        msg: "✓ Marked present — check out when you leave so your time is recorded",
+      });
       refresh();
     } catch (err) {
       const msg =
         err instanceof ApiError ? err.message : "Could not mark attendance";
+      setFeedback({ id: sessionId, kind: "err", msg });
+    } finally {
+      setMarking(null);
+    }
+  }
+
+  // Check out of the practical the student marked, recording real time spent.
+  // Reuses the lab-presence check-out endpoint; feedback is keyed to the session
+  // so it shows on the practical card.
+  async function checkOutPractical(sessionId: number, presenceId: number) {
+    setFeedback(null);
+    setMarking(sessionId);
+    try {
+      await api(`/api/lab-presence/${presenceId}/check-out`, { method: "POST" });
+      setFeedback({
+        id: sessionId,
+        kind: "ok",
+        msg: "✓ Checked out — your time has been recorded",
+      });
+      refresh();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Check-out failed";
       setFeedback({ id: sessionId, kind: "err", msg });
     } finally {
       setMarking(null);
@@ -326,6 +354,7 @@ export default function StudentDashboard() {
               </div>
               <div className="text-xs mt-1" style={{ color: "var(--color-muted)" }}>
                 Checked in {new Date(current.checked_in_at).toLocaleString()}
+                {current.source === "practical" && " · practical session"}
               </div>
             </div>
             <button
@@ -506,14 +535,25 @@ export default function StudentDashboard() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => mark(s.id)}
-                  disabled={marking === s.id}
-                  className={primaryBtnCls}
-                  style={{ backgroundColor: "var(--color-success)" }}
-                >
-                  {marking === s.id ? "Marking…" : "Mark Present ✋"}
-                </button>
+                {current?.session_id === s.id ? (
+                  <button
+                    onClick={() => checkOutPractical(s.id, current.id)}
+                    disabled={marking === s.id}
+                    className={primaryBtnCls}
+                    style={{ backgroundColor: "var(--color-danger)" }}
+                  >
+                    {marking === s.id ? "Checking out…" : "Check out 🚪"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => mark(s.id)}
+                    disabled={marking === s.id}
+                    className={primaryBtnCls}
+                    style={{ backgroundColor: "var(--color-success)" }}
+                  >
+                    {marking === s.id ? "Marking…" : "Mark Present ✋"}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

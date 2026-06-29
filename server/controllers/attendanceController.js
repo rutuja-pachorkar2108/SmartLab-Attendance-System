@@ -48,17 +48,28 @@ async function markAttendance(req, res) {
         throw err;
     }
 
-    // Marking practical attendance also counts as lab presence for the lab's TA:
-    // record a completed visit spanning the practical window (now → session end).
+    // Marking practical attendance also opens a lab-presence visit for the lab's
+    // TA. The visit starts now and stays OPEN: the student must check out when
+    // they leave (or it auto-closes at the session's scheduled end), so recorded
+    // presence reflects the time actually spent — not the whole scheduled window.
     // The lab is the one the practical's course is held in; skip if none is set.
     // Best-effort — a presence-logging hiccup must not fail the attendance mark.
     if (lab_id) {
         try {
+            // A student can only be in one place at a time. Close any visit still
+            // open (a manual check-in, or a forgotten earlier one) before opening
+            // this one, so the "one open visit per student" unique index holds.
+            await query(
+                `UPDATE lab_presence SET checked_out_at = NOW()
+                 WHERE student_id = $1 AND checked_out_at IS NULL
+                   AND NOW() > checked_in_at`,
+                [req.user.id]
+            );
             await query(
                 `INSERT INTO lab_presence
                     (lab_id, student_id, checked_in_at, checked_out_at, ip_address, source, session_id)
-                 VALUES ($1, $2, NOW(), $3, $4, 'practical', $5)`,
-                [lab_id, req.user.id, scheduled_end, req.ip, sid]
+                 VALUES ($1, $2, NOW(), NULL, $3, 'practical', $4)`,
+                [lab_id, req.user.id, req.ip, sid]
             );
         } catch (err) {
             console.error('Failed to record lab presence for practical attendance:', err);
